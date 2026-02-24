@@ -5,7 +5,7 @@ from typing import List, Optional
 from database import get_db
 from models import Paper, Author, Category
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timedelta
 
 router = APIRouter()
 
@@ -41,7 +41,9 @@ def get_papers(
     limit: int = Query(20, ge=1, le=100),
     search: Optional[str] = None,
     category: Optional[str] = None,
-    author: Optional[str] = None
+    author: Optional[str] = None,
+    days: Optional[int] = None,
+    date: Optional[str] = None
 ):
     query = db.query(Paper)
     
@@ -60,6 +62,19 @@ def get_papers(
         
     if author:
         query = query.filter(Paper.authors.any(Author.name.ilike(f"%{author}%")))
+        
+    if days is not None:
+        cutoff = datetime.utcnow() - timedelta(days=days)
+        query = query.filter(Paper.published_date >= cutoff)
+        
+    if date:
+        try:
+            target_date = datetime.strptime(date, "%Y-%m-%d").date()
+            start_datetime = datetime.combine(target_date, datetime.min.time())
+            end_datetime = start_datetime + timedelta(days=1)
+            query = query.filter(Paper.published_date >= start_datetime, Paper.published_date < end_datetime)
+        except ValueError:
+            pass # Ignore invalid date formats
         
     papers = query.order_by(Paper.published_date.desc()).offset(skip).limit(limit).all()
     return papers

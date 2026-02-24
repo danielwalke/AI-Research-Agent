@@ -1,7 +1,7 @@
 import React from 'react'
 import { Search } from 'lucide-react'
 
-export default function SidebarFilter({ search, setSearch, category, setCategory }) {
+export default function SidebarFilter({ search, setSearch, category, setCategory, days, setDays, date, setDate }) {
     const categories = [
         { id: '', name: 'All Categories' },
         { id: 'cs.AI', name: 'Artificial Intelligence' },
@@ -38,6 +38,43 @@ export default function SidebarFilter({ search, setSearch, category, setCategory
                         {cat.name}
                     </button>
                 ))}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
+                <h4 style={{ color: 'var(--text-secondary)' }}>Time Range</h4>
+                <div style={{ position: 'relative', marginBottom: '4px' }}>
+                    <input
+                        type="date"
+                        className="input-field"
+                        value={date || ''}
+                        onChange={(e) => {
+                            setDate(e.target.value);
+                            if (e.target.value) setDays('');
+                        }}
+                        style={{ width: '100%', colorScheme: 'dark' }}
+                    />
+                </div>
+                <button
+                    className={`btn ${days === 7 && !date ? 'btn-primary' : ''}`}
+                    style={{ justifyContent: 'flex-start' }}
+                    onClick={() => { setDays(7); setDate(''); }}
+                >
+                    Last 7 days
+                </button>
+                <button
+                    className={`btn ${days === 30 && !date ? 'btn-primary' : ''}`}
+                    style={{ justifyContent: 'flex-start' }}
+                    onClick={() => { setDays(30); setDate(''); }}
+                >
+                    Last 30 days
+                </button>
+                <button
+                    className={`btn ${days === '' && !date ? 'btn-primary' : ''}`}
+                    style={{ justifyContent: 'flex-start' }}
+                    onClick={() => { setDays(''); setDate(''); }}
+                >
+                    All Time
+                </button>
             </div>
         </div>
     )
