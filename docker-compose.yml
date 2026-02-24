@@ -5,8 +5,9 @@ services:
     build:
       context: ./backend
     container_name: arxiv_backend
+    env_file:
+      - ./backend/.env
     environment:
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - DATABASE_URL=sqlite:///./data/arxiv_newsletter.db
     volumes:
       - ./backend/data:/app/data
