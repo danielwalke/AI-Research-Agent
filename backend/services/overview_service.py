@@ -12,7 +12,8 @@ from typing import List, Dict, Tuple, Optional
 from sqlalchemy.orm import Session
 from openai import AsyncOpenAI
 
-from models import Paper, Category
+from sqlalchemy import or_
+from models import Paper, Author, Category
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -201,20 +202,36 @@ async def generate_overview(
     db: Session,
     start_date: datetime,
     end_date: datetime,
+    search: Optional[str] = None,
+    category: Optional[str] = None,
 ) -> Dict:
     """
-    Generate a comprehensive markdown narrative overview of papers in the
-    given date range.
+    Generate a comprehensive markdown narrative overview of papers matching
+    the given filters (date range, search, category).
     
     Returns dict with keys: markdown, paper_count, cluster_count
     """
-    # 1. Query papers
-    papers = (
-        db.query(Paper)
-        .filter(Paper.published_date >= start_date, Paper.published_date < end_date)
-        .order_by(Paper.published_date.desc())
-        .all()
-    )
+    # 1. Query papers with all filters
+    query = db.query(Paper)
+    
+    if start_date:
+        query = query.filter(Paper.published_date >= start_date)
+    if end_date:
+        query = query.filter(Paper.published_date < end_date)
+    
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            or_(
+                Paper.title.ilike(search_term),
+                Paper.abstract.ilike(search_term),
+            )
+        )
+    
+    if category:
+        query = query.filter(Paper.categories.any(Category.name == category))
+    
+    papers = query.order_by(Paper.published_date.desc()).all()
 
     if not papers:
         return {

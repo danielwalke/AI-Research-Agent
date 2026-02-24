@@ -54,7 +54,7 @@ export default function Home() {
                 setShowOverview={setShowOverview}
             />
             {showOverview ? (
-                <ResearchOverview startDate={startDate} endDate={endDate} />
+                <ResearchOverview startDate={startDate} endDate={endDate} search={search} category={category} />
             ) : (
                 <NewsletterList papers={papers} loading={loading} />
             )}
