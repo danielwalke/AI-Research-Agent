@@ -42,6 +42,20 @@ a {
   text-decoration: none;
 }
 
+.mobile-only {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .mobile-only {
+    display: flex !important;
+  }
+
+  .desktop-only {
+    display: none !important;
+  }
+}
+
 /* Glass panel utility */
 .glass-panel {
   background: var(--surface-color);
@@ -140,7 +154,7 @@ h6 {
 /* Layouts */
 .app-container {
   display: flex;
-  height: 100vh;
+  height: 100dvh;
   width: 100vw;
   overflow: hidden;
 }
@@ -171,7 +185,7 @@ h6 {
 /* Main Layout for Split View (Details) */
 .details-container {
   display: flex;
-  height: 100vh;
+  height: 100dvh;
   width: 100vw;
   overflow: hidden;
 }
@@ -345,7 +359,7 @@ h6 {
     flex-direction: column;
     overflow-y: auto;
     height: auto;
-    min-height: 100vh;
+    min-height: 100dvh;
   }
 
   .sidebar {
@@ -364,7 +378,7 @@ h6 {
 
   .details-container {
     flex-direction: column;
-    height: 100vh;
+    height: 100dvh;
     overflow: hidden;
     position: relative;
     padding-bottom: 60px;

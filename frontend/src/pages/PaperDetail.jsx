@@ -49,15 +49,23 @@ export default function PaperDetail() {
                         </span>
                     </div>
                 </div>
-                <div style={{ flex: 1, backgroundColor: '#525659' }}>
+                <div style={{ flex: 1, backgroundColor: '#525659', position: 'relative' }}>
                     {pdfUrl ? (
-                        <iframe
-                            src={pdfUrl}
-                            width="100%"
-                            height="100%"
-                            style={{ border: 'none' }}
-                            title="PDF View"
-                        />
+                        <>
+                            <div className="mobile-only" style={{ padding: '8px 16px', background: '#333', borderBottom: '1px solid #444', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ color: '#ccc', fontSize: '0.8rem' }}>PDF Preview</span>
+                                <a href={pdfUrl} target="_blank" rel="noreferrer" className="btn" style={{ padding: '4px 8px', fontSize: '0.75rem', background: 'var(--primary-color)' }}>
+                                    Open Full PDF
+                                </a>
+                            </div>
+                            <iframe
+                                src={pdfUrl}
+                                width="100%"
+                                height="100%"
+                                style={{ border: 'none' }}
+                                title="PDF View"
+                            />
+                        </>
                     ) : (
                         <div style={{ padding: 40, color: 'white' }}>No PDF available.</div>
                     )}

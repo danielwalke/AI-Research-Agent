@@ -43,7 +43,9 @@ def get_papers(
     category: Optional[str] = None,
     author: Optional[str] = None,
     days: Optional[int] = None,
-    date: Optional[str] = None
+    date: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
 ):
     query = db.query(Paper)
     
@@ -70,11 +72,25 @@ def get_papers(
     if date:
         try:
             target_date = datetime.strptime(date, "%Y-%m-%d").date()
-            start_datetime = datetime.combine(target_date, datetime.min.time())
-            end_datetime = start_datetime + timedelta(days=1)
-            query = query.filter(Paper.published_date >= start_datetime, Paper.published_date < end_datetime)
+            start_dt = datetime.combine(target_date, datetime.min.time())
+            end_dt = start_dt + timedelta(days=1)
+            query = query.filter(Paper.published_date >= start_dt, Paper.published_date < end_dt)
         except ValueError:
-            pass # Ignore invalid date formats
+            pass
+            
+    if start_date:
+        try:
+            s_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            query = query.filter(Paper.published_date >= s_dt)
+        except ValueError:
+            pass
+            
+    if end_date:
+        try:
+            e_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+            query = query.filter(Paper.published_date < e_dt)
+        except ValueError:
+            pass
         
     papers = query.order_by(Paper.published_date.desc()).offset(skip).limit(limit).all()
     return papers

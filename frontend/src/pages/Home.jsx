@@ -7,16 +7,20 @@ export default function Home() {
     const [papers, setPapers] = useState([])
     const [search, setSearch] = useState('')
     const [category, setCategory] = useState('')
-    const [days, setDays] = useState(7)
-    const [date, setDate] = useState('')
+    const [startDate, setStartDate] = useState(() => {
+        const d = new Date()
+        d.setDate(d.getDate() - 7)
+        return d.toISOString().split('T')[0]
+    })
+    const [endDate, setEndDate] = useState('')
     const [loading, setLoading] = useState(false)
 
     const fetchPapers = async () => {
         setLoading(true)
         try {
             const params = { search, category, limit: 20 }
-            if (days !== '') params.days = days
-            if (date !== '') params.date = date
+            if (startDate) params.start_date = startDate
+            if (endDate) params.end_date = endDate
             const res = await axios.get('/api/papers/', { params })
             setPapers(res.data)
         } catch (err) {
@@ -31,7 +35,7 @@ export default function Home() {
             fetchPapers()
         }, 500)
         return () => clearTimeout(delayDebounceFn)
-    }, [search, category, days, date])
+    }, [search, category, startDate, endDate])
 
     return (
         <>
@@ -40,10 +44,10 @@ export default function Home() {
                 setSearch={setSearch}
                 category={category}
                 setCategory={setCategory}
-                days={days}
-                setDays={setDays}
-                date={date}
-                setDate={setDate}
+                startDate={startDate}
+                setStartDate={setStartDate}
+                endDate={endDate}
+                setEndDate={setEndDate}
             />
             <NewsletterList papers={papers} loading={loading} />
         </>
