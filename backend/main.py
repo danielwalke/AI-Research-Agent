@@ -7,7 +7,7 @@ import datetime
 
 from database import engine, Base, SessionLocal
 from services.arxiv_service import fetch_and_store_latest_papers
-from routers import papers, chat
+from routers import papers, chat, overview
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -50,6 +50,7 @@ app.add_middleware(
 
 app.include_router(papers.router, prefix="/api/papers", tags=["papers"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
+app.include_router(overview.router, prefix="/api/overview", tags=["overview"])
 
 @app.get("/")
 def root():

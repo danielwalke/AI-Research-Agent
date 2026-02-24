@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import SidebarFilter from '../components/SidebarFilter'
 import NewsletterList from '../components/NewsletterList'
+import ResearchOverview from '../components/ResearchOverview'
 
 export default function Home() {
     const [papers, setPapers] = useState([])
@@ -14,6 +15,7 @@ export default function Home() {
     })
     const [endDate, setEndDate] = useState('')
     const [loading, setLoading] = useState(false)
+    const [showOverview, setShowOverview] = useState(false)
 
     const fetchPapers = async () => {
         setLoading(true)
@@ -48,8 +50,14 @@ export default function Home() {
                 setStartDate={setStartDate}
                 endDate={endDate}
                 setEndDate={setEndDate}
+                showOverview={showOverview}
+                setShowOverview={setShowOverview}
             />
-            <NewsletterList papers={papers} loading={loading} />
+            {showOverview ? (
+                <ResearchOverview startDate={startDate} endDate={endDate} />
+            ) : (
+                <NewsletterList papers={papers} loading={loading} />
+            )}
         </>
     )
 }

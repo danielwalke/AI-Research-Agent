@@ -1,7 +1,7 @@
 import React from 'react'
-import { Search } from 'lucide-react'
+import { Search, List, Sparkles } from 'lucide-react'
 
-export default function SidebarFilter({ search, setSearch, category, setCategory, startDate, setStartDate, endDate, setEndDate }) {
+export default function SidebarFilter({ search, setSearch, category, setCategory, startDate, setStartDate, endDate, setEndDate, showOverview, setShowOverview }) {
     const categories = [
         { id: '', name: 'All Categories' },
         { id: 'cs.AI', name: 'Artificial Intelligence' },
@@ -19,13 +19,31 @@ export default function SidebarFilter({ search, setSearch, category, setCategory
             const start = new Date()
             start.setDate(end.getDate() - days)
             setStartDate(start.toISOString().split('T')[0])
-            setEndDate('') // Clear end date to mean "up to now" or set to end.toISOString().split('T')[0]
+            setEndDate('')
         }
     }
 
     return (
         <div className="sidebar">
             <h2>Curated ArXiv</h2>
+
+            {/* View Toggle */}
+            <div style={{ display: 'flex', gap: '4px', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--border-radius-md)', padding: '4px' }}>
+                <button
+                    className={`btn ${!showOverview ? 'btn-primary' : ''}`}
+                    style={{ flex: 1, padding: '8px 12px', fontSize: '0.85rem' }}
+                    onClick={() => setShowOverview(false)}
+                >
+                    <List size={14} /> Papers
+                </button>
+                <button
+                    className={`btn ${showOverview ? 'btn-primary' : ''}`}
+                    style={{ flex: 1, padding: '8px 12px', fontSize: '0.85rem' }}
+                    onClick={() => setShowOverview(true)}
+                >
+                    <Sparkles size={14} /> Overview
+                </button>
+            </div>
 
             <div style={{ position: 'relative' }}>
                 <Search style={{ position: 'absolute', top: 12, left: 16, color: 'var(--text-tertiary)' }} size={18} />

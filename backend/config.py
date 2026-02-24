@@ -13,6 +13,9 @@ class Settings(BaseSettings):
         "cs.LG"
     ]
     max_papers_per_fetch: int = 50
+    overview_model: str = "google/gemini-2.0-flash-001"
+    overview_context_window: int = 1000000  # fallback if API fetch fails
+    overview_budget_ratio: float = 0.80
 
     class Config:
         env_file = ".env"
