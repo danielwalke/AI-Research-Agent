@@ -18,6 +18,7 @@ fi
 
 # 2. Build and start the docker containers in detached mode
 echo "-> Building and starting Docker containers..."
+mkdir -p backend/data
 docker compose up -d --build
 
 # Wait a few seconds for containers to initialize

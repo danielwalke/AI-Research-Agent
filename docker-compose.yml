@@ -7,8 +7,9 @@ services:
     container_name: arxiv_backend
     environment:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - DATABASE_URL=sqlite:///./data/arxiv_newsletter.db
     volumes:
-      - ./backend/arxiv_newsletter.db:/app/arxiv_newsletter.db
+      - ./backend/data:/app/data
     restart: unless-stopped
 
   frontend:
