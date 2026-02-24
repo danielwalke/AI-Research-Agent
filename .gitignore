@@ -5,3 +5,5 @@ __pycache__/
 *.db
 dist/
 .DS_Store
+ngrok.log
+backend/data/
