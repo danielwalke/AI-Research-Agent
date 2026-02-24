@@ -12,7 +12,7 @@ export default function Home() {
     const fetchPapers = async () => {
         setLoading(true)
         try {
-            const res = await axios.get('http://localhost:8080/api/papers/', {
+            const res = await axios.get('/api/papers/', {
                 params: { search, category, limit: 20 }
             })
             setPapers(res.data)

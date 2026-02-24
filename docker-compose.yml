@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: arxiv_backend
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+    volumes:
+      - ./backend/arxiv_newsletter.db:/app/arxiv_newsletter.db
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: arxiv_frontend
+    ports:
+      - "5174:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

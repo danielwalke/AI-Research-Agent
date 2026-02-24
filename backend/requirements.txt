@@ -1,0 +1,10 @@
+fastapi==0.110.0
+uvicorn==0.28.0
+sqlalchemy==2.0.28
+arxiv==2.1.0
+pymupdf==1.25.0
+apscheduler==3.10.4
+openai==1.14.0
+pydantic==2.6.4
+pydantic-settings==2.2.1
+python-dotenv==1.0.1

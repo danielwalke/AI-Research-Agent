@@ -13,7 +13,7 @@ export default function PaperDetail() {
     useEffect(() => {
         const fetchPaper = async () => {
             try {
-                const res = await axios.get(`http://localhost:8080/api/papers/${id}`)
+                const res = await axios.get(`/api/papers/${id}`)
                 setPaper(res.data)
             } catch (err) {
                 console.error(err)
