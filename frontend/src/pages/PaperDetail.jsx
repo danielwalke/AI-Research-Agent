@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
-import { ArrowLeft, Target, Users, Calendar } from 'lucide-react'
+import { ArrowLeft, Target, Users, Calendar, FileText, MessageSquare } from 'lucide-react'
 import ChatInterface from '../components/ChatInterface'
 
 export default function PaperDetail() {
@@ -9,6 +9,7 @@ export default function PaperDetail() {
     const navigate = useNavigate()
     const [paper, setPaper] = useState(null)
     const [loading, setLoading] = useState(true)
+    const [mobileTab, setMobileTab] = useState('pdf')
 
     useEffect(() => {
         const fetchPaper = async () => {
@@ -30,7 +31,7 @@ export default function PaperDetail() {
     const pdfUrl = paper.pdf_url ? paper.pdf_url.replace("http://", "https://") : null;
 
     return (
-        <div className="details-container">
+        <div className={`details-container ${mobileTab === 'pdf' ? 'show-pdf' : 'show-chat'}`}>
             <div className="pdf-panel">
                 <div style={{ padding: '24px', borderBottom: '1px solid var(--surface-border)', background: 'var(--bg-color)', color: 'var(--text-primary)' }}>
                     <button className="btn" onClick={() => navigate(-1)} style={{ marginBottom: '16px' }}>
@@ -65,6 +66,23 @@ export default function PaperDetail() {
 
             <div className="chat-panel">
                 <ChatInterface paperId={paper.id} />
+            </div>
+
+            <div className="mobile-tabs">
+                <button
+                    className={`tab-btn ${mobileTab === 'pdf' ? 'active' : ''}`}
+                    onClick={() => setMobileTab('pdf')}
+                >
+                    <FileText size={20} />
+                    <span>PDF</span>
+                </button>
+                <button
+                    className={`tab-btn ${mobileTab === 'chat' ? 'active' : ''}`}
+                    onClick={() => setMobileTab('chat')}
+                >
+                    <MessageSquare size={20} />
+                    <span>AI Assistant</span>
+                </button>
             </div>
         </div>
     )

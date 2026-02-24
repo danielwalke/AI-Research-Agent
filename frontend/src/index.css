@@ -364,25 +364,79 @@ h6 {
 
   .details-container {
     flex-direction: column;
-    height: auto;
-    overflow-y: visible;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+    padding-bottom: 60px;
+    /* Space for the bottom navigation */
   }
 
   .pdf-panel {
     width: 100%;
     max-width: 100%;
-    height: 60vh;
-    min-height: 500px;
+    height: 100%;
+    min-height: 100%;
     flex: none;
     border-right: none;
-    border-bottom: 1px solid var(--surface-border);
     resize: none;
+    display: none;
   }
 
   .chat-panel {
     width: 100%;
-    height: 60vh;
-    min-height: 500px;
+    height: 100%;
+    min-height: 100%;
     flex: none;
+    display: none;
+  }
+
+  /* Toggled display */
+  .details-container.show-pdf .pdf-panel {
+    display: flex;
+  }
+
+  .details-container.show-chat .chat-panel {
+    display: flex;
+  }
+}
+
+/* Base styles for mobile tabs (hidden by default on desktop) */
+.mobile-tabs {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-tabs {
+    display: flex;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: var(--surface-color);
+    border-top: 1px solid var(--surface-border);
+    backdrop-filter: blur(16px);
+    z-index: 10;
+  }
+
+  .tab-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    background: transparent;
+    border: none;
+    color: var(--text-tertiary);
+    font-size: 0.75rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all var(--transition-speed);
+  }
+
+  .tab-btn.active {
+    color: var(--primary-color);
+    background: rgba(99, 102, 241, 0.05);
   }
 }
