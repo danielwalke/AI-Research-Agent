@@ -26,14 +26,56 @@ export default function ResearchOverview({ startDate, endDate, search, category 
             if (search) body.search = search
             if (category) body.category = category
 
-            const res = await axios.post('/api/overview/generate', body)
-            setMarkdown(res.data.markdown)
-            setPaperCount(res.data.paper_count)
-            setClusterCount(res.data.cluster_count)
-            setShowChat(true)
+            const response = await fetch('/api/overview/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+
+            if (!response.ok) {
+                let errDetail = 'Failed to generate overview.';
+                try {
+                     const errData = await response.json();
+                     errDetail = errData.detail || errDetail;
+                } catch(e) {}
+                throw new Error(errDetail);
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                buffer += decoder.decode(value, { stream: true });
+                const parts = buffer.split('\n\n');
+                buffer = parts.pop() || '';
+
+                for (const part of parts) {
+                    const line = part.trim();
+                    if (line.startsWith('data:')) {
+                        const dataStr = line.substring(5).trim();
+                        if (!dataStr) continue;
+                        
+                        const data = JSON.parse(dataStr);
+                        if (data.status === 'processing') {
+                            // heartbeat, do nothing
+                        } else if (data.status === 'complete') {
+                            setMarkdown(data.result.markdown);
+                            setPaperCount(data.result.paper_count);
+                            setClusterCount(data.result.cluster_count);
+                            setShowChat(true);
+                        } else if (data.status === 'error') {
+                            throw new Error(data.detail || 'Server encountered an error.');
+                        }
+                    }
+                }
+            }
         } catch (err) {
             console.error(err)
-            setError(err.response?.data?.detail || 'Failed to generate overview. Please try again.')
+            setError(err.message || 'Failed to generate overview. Please try again.')
         } finally {
             setLoading(false)
         }

@@ -3,6 +3,9 @@ Overview Router — /api/overview
 Generates a coherent markdown narrative summarizing filtered papers,
 and provides a chat interface to discuss the overview.
 """
+import asyncio
+import json
+from fastapi.responses import StreamingResponse
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -51,7 +54,7 @@ class OverviewChatResponse(BaseModel):
     reply: str
 
 
-@router.post("/generate", response_model=OverviewResponse)
+@router.post("/generate")
 async def generate_research_overview(
     request: OverviewRequest,
     db: Session = Depends(get_db),
@@ -78,15 +81,34 @@ async def generate_research_overview(
     else:
         end_dt = datetime.utcnow() + timedelta(days=1)
 
-    try:
-        result = await generate_overview(
-            db, start_dt, end_dt,
-            search=request.search,
-            category=request.category,
+    async def event_generator():
+        task = asyncio.create_task(
+            generate_overview(
+                db, start_dt, end_dt,
+                search=request.search,
+                category=request.category,
+            )
         )
-        return OverviewResponse(**result)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Overview generation failed: {e}")
+        # Yield initial status immediately
+        yield f"data: {json.dumps({'status': 'processing'})}\n\n"
+        
+        while not task.done():
+            try:
+                # wait_for throws TimeoutError if timeout expires
+                await asyncio.wait_for(asyncio.shield(task), timeout=10.0)
+            except asyncio.TimeoutError:
+                yield f"data: {json.dumps({'status': 'processing'})}\n\n"
+            except Exception:
+                # If inner task fails, task.done() becomes True, loop exits
+                pass
+        
+        try:
+            result = task.result()
+            yield f"data: {json.dumps({'status': 'complete', 'result': result})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'status': 'error', 'detail': str(e)})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 @router.post("/chat", response_model=OverviewChatResponse)
