@@ -240,8 +240,13 @@ async def generate_overview(
             "cluster_count": 0,
         }
 
-    # 2. Cluster
-    clusters = cluster_papers_by_category(papers)
+    # 2. Cluster (skip re-clustering when a specific category is selected)
+    if category:
+        # When filtering by category, show all papers under that category heading
+        cat_label = _friendly_category(category)
+        clusters = {category: papers}
+    else:
+        clusters = cluster_papers_by_category(papers)
     logger.info(f"Found {len(papers)} papers in {len(clusters)} categories")
 
     # 3. Determine token budget
