@@ -1,7 +1,7 @@
 import React from 'react'
-import { Search, List, Sparkles } from 'lucide-react'
+import { Search, List, Sparkles, Download } from 'lucide-react'
 
-export default function SidebarFilter({ search, setSearch, category, setCategory, startDate, setStartDate, endDate, setEndDate, showOverview, setShowOverview }) {
+export default function SidebarFilter({ search, setSearch, category, setCategory, startDate, setStartDate, endDate, setEndDate, showOverview, setShowOverview, onFetchRange, fetchingPapers, fetchMessage }) {
     const categories = [
         { id: '', name: 'All Categories' },
         { id: 'cs.AI', name: 'Artificial Intelligence' },
@@ -119,7 +119,35 @@ export default function SidebarFilter({ search, setSearch, category, setCategory
                         All Time
                     </button>
                 </div>
+
+                {/* Fetch from ArXiv */}
+                <button
+                    className="btn"
+                    onClick={onFetchRange}
+                    disabled={!startDate || fetchingPapers}
+                    style={{
+                        marginTop: '8px',
+                        padding: '10px 12px',
+                        fontSize: '0.85rem',
+                        background: fetchingPapers ? 'rgba(139, 92, 246, 0.15)' : 'rgba(139, 92, 246, 0.1)',
+                        border: '1px solid rgba(139, 92, 246, 0.3)',
+                        color: fetchingPapers ? 'var(--text-tertiary)' : 'rgb(167, 139, 250)',
+                        gap: '8px',
+                        cursor: (!startDate || fetchingPapers) ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s ease',
+                    }}
+                    title={!startDate ? 'Set a start date to fetch papers' : 'Fetch papers from ArXiv for the selected date range'}
+                >
+                    <Download size={16} className={fetchingPapers ? 'spin-animation' : ''} />
+                    {fetchingPapers ? (fetchMessage || 'Fetching...') : 'Fetch from ArXiv'}
+                </button>
+                {!startDate && (
+                    <p style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', margin: 0 }}>
+                        Set a start date to fetch historical papers
+                    </p>
+                )}
             </div>
         </div>
     )
 }
+

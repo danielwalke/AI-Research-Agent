@@ -1,11 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from typing import List, Optional
-from database import get_db
+from database import get_db, SessionLocal
 from models import Paper, Author, Category
 from pydantic import BaseModel
 from datetime import datetime, timedelta
+from services.arxiv_service import fetch_papers_for_range
+import asyncio
+import json
 
 router = APIRouter()
 
@@ -33,6 +37,11 @@ class PaperResponse(BaseModel):
 
 class PaperDetailResponse(PaperResponse):
     full_text: Optional[str]
+
+class FetchRangeRequest(BaseModel):
+    start_date: str  # YYYY-MM-DD
+    end_date: str    # YYYY-MM-DD
+    category: Optional[str] = None
 
 @router.get("/", response_model=List[PaperResponse])
 def get_papers(
@@ -101,3 +110,52 @@ def get_paper(paper_id: str, db: Session = Depends(get_db)):
     if not paper:
         raise HTTPException(status_code=404, detail="Paper not found")
     return paper
+
+
+@router.post("/fetch-range")
+async def fetch_range(request: FetchRangeRequest):
+    """
+    Fetch papers from ArXiv for a specific date range.
+    Streams SSE heartbeats to keep the connection alive.
+    """
+    try:
+        start_dt = datetime.strptime(request.start_date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid start_date format, use YYYY-MM-DD")
+
+    try:
+        end_dt = datetime.strptime(request.end_date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid end_date format, use YYYY-MM-DD")
+
+    async def event_generator():
+        loop = asyncio.get_event_loop()
+
+        # Run the sync fetch in a thread to avoid blocking
+        db = SessionLocal()
+        try:
+            task = loop.run_in_executor(
+                None,
+                fetch_papers_for_range,
+                db, start_dt, end_dt, request.category,
+            )
+
+            yield f"data: {json.dumps({'status': 'processing', 'message': 'Starting ArXiv fetch...'})}\n\n"
+
+            while not task.done():
+                try:
+                    await asyncio.wait_for(asyncio.shield(task), timeout=10.0)
+                except asyncio.TimeoutError:
+                    yield f"data: {json.dumps({'status': 'processing', 'message': 'Still fetching papers from ArXiv...'})}\n\n"
+                except Exception:
+                    pass
+
+            try:
+                new_count = task.result()
+                yield f"data: {json.dumps({'status': 'complete', 'new_papers': new_count})}\n\n"
+            except Exception as e:
+                yield f"data: {json.dumps({'status': 'error', 'detail': str(e)})}\n\n"
+        finally:
+            db.close()
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
