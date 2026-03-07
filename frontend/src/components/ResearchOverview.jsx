@@ -1,7 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import axios from 'axios'
 import ReactMarkdown from 'react-markdown'
-import { BookOpen, Loader, Sparkles, RefreshCw, Send, Bot, User, MessageSquare } from 'lucide-react'
+import { BookOpen, Loader, Sparkles, RefreshCw, Send, Bot, User, MessageSquare, Mic, Download, Play, Pause, Volume2 } from 'lucide-react'
 
 export default function ResearchOverview({ startDate, endDate, search, category }) {
     const [markdown, setMarkdown] = useState('')
@@ -16,10 +16,19 @@ export default function ResearchOverview({ startDate, endDate, search, category 
     const [chatLoading, setChatLoading] = useState(false)
     const [showChat, setShowChat] = useState(false)
 
+    // Podcast state
+    const [podcastLoading, setPodcastLoading] = useState(false)
+    const [podcastUrl, setPodcastUrl] = useState('')
+    const [podcastError, setPodcastError] = useState('')
+    const [podcastStatus, setPodcastStatus] = useState('')
+    const audioRef = useRef(null)
+
     const handleGenerate = async () => {
         setLoading(true)
         setError('')
         setChatMessages([])
+        setPodcastUrl('')
+        setPodcastError('')
         try {
             const body = { start_date: startDate }
             if (endDate) body.end_date = endDate
@@ -100,6 +109,70 @@ export default function ResearchOverview({ startDate, endDate, search, category 
             setChatMessages([...updatedMessages, { role: 'assistant', content: 'Sorry, I encountered an error.' }])
         } finally {
             setChatLoading(false)
+        }
+    }
+
+    const handleGeneratePodcast = async () => {
+        if (podcastLoading || !markdown) return
+        setPodcastLoading(true)
+        setPodcastError('')
+        setPodcastUrl('')
+        setPodcastStatus('Generating podcast script...')
+
+        try {
+            const response = await fetch('/api/overview/podcast', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ overview_markdown: markdown }),
+            });
+
+            if (!response.ok) {
+                let errDetail = 'Failed to generate podcast.';
+                try {
+                    const errData = await response.json();
+                    errDetail = errData.detail || errDetail;
+                } catch(e) {}
+                throw new Error(errDetail);
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const parts = buffer.split('\n\n');
+                buffer = parts.pop() || '';
+
+                for (const part of parts) {
+                    const line = part.trim();
+                    if (line.startsWith('data:')) {
+                        const dataStr = line.substring(5).trim();
+                        if (!dataStr) continue;
+
+                        const data = JSON.parse(dataStr);
+                        if (data.status === 'generating_script') {
+                            setPodcastStatus('Writing podcast script with AI...');
+                        } else if (data.status === 'processing') {
+                            setPodcastStatus('Synthesizing audio...');
+                        } else if (data.status === 'complete') {
+                            setPodcastUrl(data.result.audio_url);
+                            setPodcastStatus('');
+                        } else if (data.status === 'error') {
+                            throw new Error(data.detail || 'Failed to generate podcast.');
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            console.error(err)
+            setPodcastError(err.message || 'Failed to generate podcast.')
+            setPodcastStatus('')
+        } finally {
+            setPodcastLoading(false)
         }
     }
 
@@ -192,7 +265,11 @@ export default function ResearchOverview({ startDate, endDate, search, category 
                             {paperCount} papers · {clusterCount} categories
                         </p>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <button className="btn btn-podcast" onClick={handleGeneratePodcast} disabled={podcastLoading} style={{ gap: '6px' }}>
+                            {podcastLoading ? <Loader size={16} className="spin-animation" /> : <Mic size={16} />}
+                            {podcastLoading ? 'Generating...' : (podcastUrl ? '🎧 Regenerate' : '🎙 Podcast')}
+                        </button>
                         <button className="btn" onClick={() => setShowChat(!showChat)} style={{ gap: '6px' }}>
                             <MessageSquare size={16} /> {showChat ? 'Hide Chat' : 'Chat'}
                         </button>
@@ -201,6 +278,49 @@ export default function ResearchOverview({ startDate, endDate, search, category 
                         </button>
                     </div>
                 </div>
+
+                {/* Podcast Player */}
+                {(podcastUrl || podcastLoading || podcastError) && (
+                    <div className="podcast-player glass-panel" style={{ margin: '16px 24px 0 24px' }}>
+                        {podcastLoading && (
+                            <div className="podcast-loading">
+                                <div className="podcast-wave">
+                                    <span></span><span></span><span></span><span></span><span></span>
+                                </div>
+                                <p>{podcastStatus}</p>
+                            </div>
+                        )}
+                        {podcastError && (
+                            <div className="podcast-error">
+                                <p style={{ color: '#f87171', margin: 0 }}>⚠️ {podcastError}</p>
+                            </div>
+                        )}
+                        {podcastUrl && !podcastLoading && (
+                            <div className="podcast-ready">
+                                <div className="podcast-icon">
+                                    <Volume2 size={24} />
+                                </div>
+                                <div className="podcast-controls">
+                                    <p className="podcast-label">🎧 Research Podcast Ready</p>
+                                    <audio
+                                        ref={audioRef}
+                                        controls
+                                        src={podcastUrl}
+                                        className="podcast-audio"
+                                    />
+                                </div>
+                                <a
+                                    href={podcastUrl}
+                                    download
+                                    className="btn podcast-download"
+                                    title="Download MP3"
+                                >
+                                    <Download size={16} />
+                                </a>
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 <div className="overview-body glass-panel" style={{ margin: '16px 24px 24px 24px' }}>
                     <ReactMarkdown>{markdown}</ReactMarkdown>

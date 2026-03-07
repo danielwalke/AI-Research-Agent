@@ -2,10 +2,12 @@
 Overview Router — /api/overview
 Generates a coherent markdown narrative summarizing filtered papers,
 and provides a chat interface to discuss the overview.
+Also generates podcast audio from the overview.
 """
 import asyncio
 import json
-from fastapi.responses import StreamingResponse
+from pathlib import Path
+from fastapi.responses import StreamingResponse, FileResponse
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -16,6 +18,7 @@ from openai import AsyncOpenAI
 from database import get_db
 from config import settings
 from services.overview_service import generate_overview
+from services.podcast_service import generate_podcast, PODCAST_DIR
 
 router = APIRouter()
 
@@ -52,6 +55,10 @@ class OverviewChatRequest(BaseModel):
 
 class OverviewChatResponse(BaseModel):
     reply: str
+
+
+class PodcastRequest(BaseModel):
+    overview_markdown: str
 
 
 @router.post("/generate")
@@ -148,3 +155,58 @@ async def chat_with_overview(request: OverviewChatRequest):
         return OverviewChatResponse(reply=reply)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/podcast")
+async def generate_podcast_audio(request: PodcastRequest):
+    """Generate a podcast MP3 from the overview markdown using edge-tts.
+    Streams SSE events with heartbeat to prevent timeouts."""
+    if not settings.openrouter_api_key:
+        raise HTTPException(
+            status_code=500, detail="OpenRouter API key not configured"
+        )
+
+    if not request.overview_markdown or len(request.overview_markdown.strip()) < 50:
+        raise HTTPException(
+            status_code=400, detail="Overview markdown is too short to generate a podcast"
+        )
+
+    async def event_generator():
+        task = asyncio.create_task(
+            generate_podcast(request.overview_markdown)
+        )
+        yield f"data: {json.dumps({'status': 'generating_script'})}\n\n"
+
+        while not task.done():
+            try:
+                await asyncio.wait_for(asyncio.shield(task), timeout=10.0)
+            except asyncio.TimeoutError:
+                yield f"data: {json.dumps({'status': 'processing'})}\n\n"
+            except Exception:
+                pass
+
+        try:
+            result = task.result()
+            yield f"data: {json.dumps({'status': 'complete', 'result': result})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'status': 'error', 'detail': str(e)})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@router.get("/podcast/{filename}")
+async def serve_podcast(filename: str):
+    """Serve a generated podcast MP3 file."""
+    # Sanitize filename to prevent path traversal
+    safe_filename = Path(filename).name
+    filepath = PODCAST_DIR / safe_filename
+
+    if not filepath.exists() or not filepath.suffix == ".mp3":
+        raise HTTPException(status_code=404, detail="Podcast not found")
+
+    return FileResponse(
+        path=str(filepath),
+        media_type="audio/mpeg",
+        filename=safe_filename,
+    )
+
