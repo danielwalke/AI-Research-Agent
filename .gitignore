@@ -8,3 +8,4 @@ dist/
 ngrok.log
 backend/data/
 backend/podcasts/
+.env_openai

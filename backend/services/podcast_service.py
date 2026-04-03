@@ -43,24 +43,46 @@ Guidelines:
 
 async def generate_podcast_script(markdown: str) -> str:
     """Use the LLM to convert an overview markdown into a podcast script."""
-    client = AsyncOpenAI(
+    client_new_api = None
+    if settings.openai_api_key and settings.openai_base_url:
+        client_new_api = AsyncOpenAI(
+            base_url=settings.openai_base_url.rstrip("/"),
+            api_key=settings.openai_api_key
+        )
+        
+    client_openrouter = AsyncOpenAI(
         base_url="https://openrouter.ai/api/v1",
         api_key=settings.openrouter_api_key,
     )
+    
+    messages = [
+        {"role": "system", "content": SCRIPT_SYSTEM_PROMPT},
+        {
+            "role": "user",
+            "content": (
+                "Here is the research overview to convert into a podcast script:\n\n"
+                f"{markdown}"
+            ),
+        },
+    ]
 
     try:
-        completion = await client.chat.completions.create(
+        if client_new_api:
+            try:
+                completion = await client_new_api.chat.completions.create(
+                    model=settings.openai_model,
+                    messages=messages,
+                    timeout=120,
+                )
+                script = completion.choices[0].message.content
+                logger.info(f"Generated podcast script with new API: {len(script)} chars")
+                return script
+            except Exception as e_new:
+                logger.warning(f"New API failed ({e_new}), falling back to OpenRouter...")
+                
+        completion = await client_openrouter.chat.completions.create(
             model=settings.overview_model,
-            messages=[
-                {"role": "system", "content": SCRIPT_SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": (
-                        "Here is the research overview to convert into a podcast script:\n\n"
-                        f"{markdown}"
-                    ),
-                },
-            ],
+            messages=messages,
             timeout=120,
         )
         script = completion.choices[0].message.content

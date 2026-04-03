@@ -39,6 +39,9 @@ _context_window_cache: Dict[str, int] = {}
 
 async def get_context_window(client: AsyncOpenAI, model: str) -> int:
     """Fetch the model's context window from OpenRouter and cache it."""
+    if model == getattr(settings, "openai_model", ""):
+        return 128000
+
     if model in _context_window_cache:
         return _context_window_cache[model]
 
@@ -250,12 +253,39 @@ async def generate_overview(
     logger.info(f"Found {len(papers)} papers in {len(clusters)} categories")
 
     # 3. Determine token budget
-    model = settings.overview_model
-    client = AsyncOpenAI(
+    client_new_api = None
+    if settings.openai_api_key and settings.openai_base_url:
+        client_new_api = AsyncOpenAI(
+            base_url=settings.openai_base_url.rstrip("/"),
+            api_key=settings.openai_api_key
+        )
+        
+    client_openrouter = AsyncOpenAI(
         base_url="https://openrouter.ai/api/v1",
         api_key=settings.openrouter_api_key,
     )
-    context_window = await get_context_window(client, model)
+
+    primary_model = settings.openai_model if client_new_api else settings.overview_model
+    context_window = await get_context_window(client_openrouter, primary_model)
+
+    async def call_llm(messages: List[Dict[str, str]], timeout: int = 120) -> str:
+        if client_new_api:
+            try:
+                completion = await client_new_api.chat.completions.create(
+                    model=settings.openai_model,
+                    messages=messages,
+                    timeout=timeout,
+                )
+                return completion.choices[0].message.content
+            except Exception as e_new:
+                logger.warning(f"New API failed ({e_new}), falling back to OpenRouter...")
+        
+        completion = await client_openrouter.chat.completions.create(
+            model=settings.overview_model,
+            messages=messages,
+            timeout=timeout,
+        )
+        return completion.choices[0].message.content
 
     system_prompt_reserve = 300  # tokens for system prompt
     response_reserve = int(context_window * 0.10)  # 10% for response
@@ -291,15 +321,13 @@ async def generate_overview(
             )
 
             try:
-                completion = await client.chat.completions.create(
-                    model=model,
+                narrative = await call_llm(
                     messages=[
                         {"role": "system", "content": SYSTEM_PROMPT_CLUSTER},
                         {"role": "user", "content": user_prompt},
                     ],
                     timeout=120,
                 )
-                narrative = completion.choices[0].message.content
                 batch_narratives.append(narrative)
             except Exception as e:
                 logger.error(f"LLM call failed for {cat_label}: {e}")
@@ -316,15 +344,13 @@ async def generate_overview(
                 + "\n\n---\n\n".join(batch_narratives)
             )
             try:
-                completion = await client.chat.completions.create(
-                    model=model,
+                final_narrative = await call_llm(
                     messages=[
                         {"role": "system", "content": SYSTEM_PROMPT_CLUSTER},
                         {"role": "user", "content": merge_prompt},
                     ],
                     timeout=120,
                 )
-                final_narrative = completion.choices[0].message.content
             except Exception as e:
                 logger.error(f"Merge LLM call failed for {cat_label}: {e}")
                 final_narrative = "\n\n".join(batch_narratives)
@@ -339,8 +365,7 @@ async def generate_overview(
             for label, narrative, count in section_narratives
         )
         try:
-            completion = await client.chat.completions.create(
-                model=model,
+            executive_summary = await call_llm(
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT_SYNTHESIS},
                     {
@@ -350,7 +375,6 @@ async def generate_overview(
                 ],
                 timeout=120,
             )
-            executive_summary = completion.choices[0].message.content
         except Exception as e:
             logger.error(f"Executive summary LLM call failed: {e}")
 
