@@ -1,0 +1,13 @@
+C:\Users\danie\git\antigravity\research-agent\arxiv-newsletter\backend\test_overview.py:12: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  start_dt = datetime.utcnow() - timedelta(days=7)
+C:\Users\danie\git\antigravity\research-agent\arxiv-newsletter\backend\test_overview.py:13: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  end_dt = datetime.utcnow() + timedelta(days=1)
+INFO:services.overview_service:Found 60 papers in 1 categories
+INFO:httpx:HTTP Request: GET https://openrouter.ai/api/v1/models "HTTP/1.1 200 OK"
+INFO:services.overview_service:Fetched context window for google/gemini-2.0-flash-001: 1048576
+INFO:services.overview_service:Token budget: context_window=1048576, max_abstract_tokens=733703
+INFO:services.overview_service:Category 'Artificial Intelligence': 60 papers, 1 batch(es)
+INFO:httpx:HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 402 Payment Required"
+ERROR:services.overview_service:LLM call failed for Artificial Intelligence: Error code: 402 - {'error': {'message': 'This request requires more credits, or fewer max_tokens. You requested up to 8192 tokens, but can only afford 613. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account', 'code': 402, 'metadata': {'provider_name': None}}, 'user_id': 'user_39k6NIxBakAn1gJJZ6l0qAcJWux'}
+Testing generate_overview()...
+Success! Number of clusters: 1

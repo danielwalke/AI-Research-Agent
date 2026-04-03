@@ -23,7 +23,7 @@ from services.podcast_service import generate_podcast, PODCAST_DIR
 router = APIRouter()
 
 # Shared OpenRouter client
-client = AsyncOpenAI(
+client_openrouter = AsyncOpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=settings.openrouter_api_key,
 )
@@ -146,7 +146,23 @@ async def chat_with_overview(request: OverviewChatRequest):
         api_messages.append({"role": msg.role, "content": msg.content})
 
     try:
-        completion = await client.chat.completions.create(
+        if settings.openai_api_key and settings.openai_base_url:
+            client_new_api = AsyncOpenAI(
+                base_url=settings.openai_base_url.rstrip("/"),
+                api_key=settings.openai_api_key
+            )
+            try:
+                completion = await client_new_api.chat.completions.create(
+                    model=settings.openai_model,
+                    messages=api_messages,
+                    timeout=60,
+                )
+                reply = completion.choices[0].message.content
+                return OverviewChatResponse(reply=reply)
+            except Exception as e_new:
+                pass # fallback
+                
+        completion = await client_openrouter.chat.completions.create(
             model=request.model,
             messages=api_messages,
             timeout=60,
