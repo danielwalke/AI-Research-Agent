@@ -404,6 +404,20 @@ h6 {
     display: none;
   }
 
+  .chat-messages {
+    padding: 16px;
+    gap: 12px;
+  }
+
+  .chat-input-area {
+    padding: 16px;
+  }
+
+  .message-bubble {
+    padding: 10px 14px;
+    font-size: 0.95rem;
+  }
+
   /* Toggled display */
   .details-container.show-pdf .pdf-panel {
     display: flex;

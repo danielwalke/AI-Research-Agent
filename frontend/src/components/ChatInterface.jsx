@@ -1,5 +1,4 @@
-import React, { useState } from 'react'
-import axios from 'axios'
+import React, { useState, useRef, useEffect } from 'react'
 import { Send, Bot, User } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 
@@ -7,6 +6,15 @@ export default function ChatInterface({ paperId }) {
     const [messages, setMessages] = useState([])
     const [input, setInput] = useState('')
     const [loading, setLoading] = useState(false)
+    const messagesEndRef = useRef(null)
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    }
+
+    useEffect(() => {
+        scrollToBottom()
+    }, [messages, loading])
 
     const handleSend = async () => {
         if (!input.trim() || loading) return
@@ -17,16 +25,62 @@ export default function ChatInterface({ paperId }) {
         setLoading(true)
 
         try {
-            const res = await axios.post('/api/chat/', {
-                paper_id: paperId,
-                messages: updatedMessages,
-                model: "openrouter/auto"
+            const response = await fetch('/api/chat/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    paper_id: paperId,
+                    messages: updatedMessages,
+                    model: "openrouter/auto"
+                }),
             })
 
-            setMessages([...updatedMessages, { role: 'assistant', content: res.data.reply }])
+            if (!response.ok) {
+                throw new Error('Network response was not ok')
+            }
+
+            const reader = response.body.getReader()
+            const decoder = new TextDecoder('utf-8')
+            let assistantMessage = ''
+
+            // Add an empty assistant message to update progressively
+            setMessages(prev => [...prev, { role: 'assistant', content: '' }])
+
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+
+                const chunk = decoder.decode(value, { stream: true })
+                const lines = chunk.split('\n')
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6))
+                            if (data.error) {
+                                assistantMessage += `\n**Error:** ${data.error}`
+                            } else if (data.text) {
+                                assistantMessage += data.text
+                            }
+                            
+                            // Update the last message in the state
+                            setMessages(prev => {
+                                const newMsgs = [...prev]
+                                newMsgs[newMsgs.length - 1].content = assistantMessage
+                                return newMsgs
+                            })
+                        } catch (e) {
+                            console.error("Error parsing stream data:", e)
+                        }
+                    }
+                }
+            }
+
         } catch (err) {
             console.error(err)
-            setMessages([...updatedMessages, { role: 'assistant', content: 'Sorry, I encountered an error.' }])
+            setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error.' }])
         } finally {
             setLoading(false)
         }
@@ -61,11 +115,12 @@ export default function ChatInterface({ paperId }) {
                         )}
                     </div>
                 ))}
-                {loading && (
+                {loading && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
                     <div className="message-bubble message-ai" style={{ opacity: 0.7 }}>
                         <Bot size={12} style={{ marginRight: '4px' }} /> <em>Thinking...</em>
                     </div>
                 )}
+                <div ref={messagesEndRef} />
             </div>
 
             <div className="chat-input-area">
@@ -78,7 +133,7 @@ export default function ChatInterface({ paperId }) {
                         onChange={e => setInput(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleSend()}
                     />
-                    <button className="btn btn-primary" onClick={handleSend} disabled={loading} style={{ padding: '12px 16px' }}>
+                    <button className="btn btn-primary" onClick={handleSend} disabled={loading && input.trim() !== ''} style={{ padding: '12px 16px' }}>
                         <Send size={18} />
                     </button>
                 </div>
