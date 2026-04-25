@@ -10,11 +10,11 @@ from datetime import datetime
 from typing import List, Dict, Tuple, Optional
 
 from sqlalchemy.orm import Session
-from openai import AsyncOpenAI
 
 from sqlalchemy import or_
 from models import Paper, Author, Category
 from config import settings
+from services.llm_service import call_llm
 
 logger = logging.getLogger(__name__)
 
@@ -32,43 +32,15 @@ def count_tokens(text: str) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Context window discovery (cached)
+# Context window — hardcoded for the primary model (AcademicCloud doesn't
+# expose context_length in its /models response).
 # ---------------------------------------------------------------------------
-_context_window_cache: Dict[str, int] = {}
+PRIMARY_CONTEXT_WINDOW = 128_000  # Qwen 3.5 / Llama 3.3 etc.
 
 
-async def get_context_window(client: AsyncOpenAI, model: str) -> int:
-    """Fetch the model's context window from OpenRouter and cache it."""
-    if model == getattr(settings, "openai_model", ""):
-        return 128000
-
-    if model in _context_window_cache:
-        return _context_window_cache[model]
-
-    try:
-        import httpx
-        async with httpx.AsyncClient() as http:
-            resp = await http.get(
-                "https://openrouter.ai/api/v1/models",
-                headers={"Authorization": f"Bearer {settings.openrouter_api_key}"},
-                timeout=15,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            for m in data.get("data", []):
-                if m.get("id") == model:
-                    ctx = m.get("context_length", settings.overview_context_window)
-                    _context_window_cache[model] = ctx
-                    logger.info(f"Fetched context window for {model}: {ctx}")
-                    return ctx
-    except Exception as e:
-        logger.warning(f"Could not fetch context window from OpenRouter: {e}")
-
-    # Fallback
-    fallback = settings.overview_context_window
-    _context_window_cache[model] = fallback
-    logger.info(f"Using fallback context window for {model}: {fallback}")
-    return fallback
+def _get_context_window() -> int:
+    """Return the context window for the current primary model."""
+    return PRIMARY_CONTEXT_WINDOW
 
 
 # ---------------------------------------------------------------------------
@@ -253,39 +225,7 @@ async def generate_overview(
     logger.info(f"Found {len(papers)} papers in {len(clusters)} categories")
 
     # 3. Determine token budget
-    client_new_api = None
-    if settings.openai_api_key and settings.openai_base_url:
-        client_new_api = AsyncOpenAI(
-            base_url=settings.openai_base_url.rstrip("/"),
-            api_key=settings.openai_api_key
-        )
-        
-    client_openrouter = AsyncOpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=settings.openrouter_api_key,
-    )
-
-    primary_model = settings.openai_model if client_new_api else settings.overview_model
-    context_window = await get_context_window(client_openrouter, primary_model)
-
-    async def call_llm(messages: List[Dict[str, str]], timeout: int = 120) -> str:
-        if client_new_api:
-            try:
-                completion = await client_new_api.chat.completions.create(
-                    model=settings.openai_model,
-                    messages=messages,
-                    timeout=timeout,
-                )
-                return completion.choices[0].message.content
-            except Exception as e_new:
-                logger.warning(f"New API failed ({e_new}), falling back to OpenRouter...")
-        
-        completion = await client_openrouter.chat.completions.create(
-            model=settings.overview_model,
-            messages=messages,
-            timeout=timeout,
-        )
-        return completion.choices[0].message.content
+    context_window = _get_context_window()
 
     system_prompt_reserve = 300  # tokens for system prompt
     response_reserve = int(context_window * 0.10)  # 10% for response
@@ -299,7 +239,7 @@ async def generate_overview(
         f"max_abstract_tokens={max_abstract_tokens}"
     )
 
-    # 4. Generate per-cluster narratives
+    # 4. Generate per-cluster narratives (uses centralized call_llm with 3 retries + fallback)
     section_narratives: List[Tuple[str, str, int]] = []  # (category, narrative, paper_count)
 
     for cat_id, cat_papers in clusters.items():

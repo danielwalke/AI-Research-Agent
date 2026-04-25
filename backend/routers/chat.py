@@ -3,10 +3,10 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List, Optional
-from openai import AsyncOpenAI
 from database import get_db
 from models import Paper
 from config import settings
+from services.llm_service import stream_llm
 import json
 import logging
 
@@ -40,45 +40,14 @@ async def chat_with_paper(request: ChatRequest, db: Session = Depends(get_db)):
         api_messages.append({"role": msg.role, "content": msg.content})
 
     async def generate_chat_stream():
-        client_new_api = None
-        if settings.openai_api_key and settings.openai_base_url:
-            client_new_api = AsyncOpenAI(
-                base_url=settings.openai_base_url.rstrip("/"),
-                api_key=settings.openai_api_key
-            )
-            
-        client_openrouter = AsyncOpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=settings.openrouter_api_key,
-        )
-
-        model_to_use = settings.openai_model if client_new_api else request.model
-
         try:
-            if client_new_api:
-                try:
-                    stream = await client_new_api.chat.completions.create(
-                        model=model_to_use,
-                        messages=api_messages,
-                        stream=True,
-                        timeout=120
-                    )
-                    async for chunk in stream:
-                        if chunk.choices[0].delta.content is not None:
-                            yield f"data: {json.dumps({'text': chunk.choices[0].delta.content})}\n\n"
-                    return
-                except Exception as e_new:
-                    logger.warning(f"New API failed ({e_new}), falling back to OpenRouter...")
-            
-            # Fallback to openrouter
-            stream = await client_openrouter.chat.completions.create(
-                model=request.model,
+            stream = await stream_llm(
                 messages=api_messages,
-                stream=True,
-                timeout=120
+                timeout=120,
+                fallback_model=request.model,
             )
             async for chunk in stream:
-                if chunk.choices[0].delta.content is not None:
+                if chunk.choices and chunk.choices[0].delta.content is not None:
                     yield f"data: {json.dumps({'text': chunk.choices[0].delta.content})}\n\n"
         except Exception as e:
             logger.error(f"Chat stream failed: {e}")

@@ -1,20 +1,18 @@
-import os
+from pydantic import Field
 from pydantic_settings import BaseSettings
 from typing import List
-from dotenv import load_dotenv
 
-load_dotenv(".env_openai")
 
 class Settings(BaseSettings):
-    openrouter_api_key: str = os.getenv("OPENROUTER_API_KEY", "")
-    openai_api_key: str = os.getenv("API_KEY", "")
-    openai_base_url: str = os.getenv("BASE_URL", "")
-    openai_model: str = "llama-3.3-70b-instruct"
+    openrouter_api_key: str = Field(default="", alias="OPENROUTER_API_KEY")
+    openai_api_key: str = Field(default="", alias="API_KEY")
+    openai_base_url: str = Field(default="", alias="BASE_URL")
+    openai_model: str = "qwen3.5-397b-a17b"
     database_url: str = "sqlite:///./arxiv_newsletter.db"
     arxiv_categories: List[str] = [
-        "cs.*", # Computer Science
-        "stat.*", # Statistics
-        "q-bio.*", # Quantitative Biology
+        "cs.*",     # Computer Science
+        "stat.*",   # Statistics
+        "q-bio.*",  # Quantitative Biology
         "cs.AI",
         "cs.LG"
     ]
@@ -25,5 +23,8 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+        extra = "ignore"
+        populate_by_name = True
 
 settings = Settings()
+

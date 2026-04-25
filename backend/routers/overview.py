@@ -13,20 +13,14 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime, timedelta
-from openai import AsyncOpenAI
 
 from database import get_db
 from config import settings
 from services.overview_service import generate_overview
 from services.podcast_service import generate_podcast, PODCAST_DIR
+from services.llm_service import call_llm
 
 router = APIRouter()
-
-# Shared OpenRouter client
-client_openrouter = AsyncOpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=settings.openrouter_api_key,
-)
 
 
 class OverviewRequest(BaseModel):
@@ -66,9 +60,9 @@ async def generate_research_overview(
     request: OverviewRequest,
     db: Session = Depends(get_db),
 ):
-    if not settings.openrouter_api_key:
+    if not settings.openrouter_api_key and not settings.openai_api_key:
         raise HTTPException(
-            status_code=500, detail="OpenRouter API key not configured"
+            status_code=500, detail="No API key configured for LLM provider"
         )
 
     try:
@@ -122,9 +116,9 @@ async def generate_research_overview(
 async def chat_with_overview(request: OverviewChatRequest):
     """Chat with the generated overview narrative. The overview markdown
     is passed as context so the LLM can answer questions about it."""
-    if not settings.openrouter_api_key:
+    if not settings.openrouter_api_key and not settings.openai_api_key:
         raise HTTPException(
-            status_code=500, detail="OpenRouter API key not configured"
+            status_code=500, detail="No API key configured for LLM provider"
         )
 
     system_prompt = (
@@ -146,28 +140,11 @@ async def chat_with_overview(request: OverviewChatRequest):
         api_messages.append({"role": msg.role, "content": msg.content})
 
     try:
-        if settings.openai_api_key and settings.openai_base_url:
-            client_new_api = AsyncOpenAI(
-                base_url=settings.openai_base_url.rstrip("/"),
-                api_key=settings.openai_api_key
-            )
-            try:
-                completion = await client_new_api.chat.completions.create(
-                    model=settings.openai_model,
-                    messages=api_messages,
-                    timeout=60,
-                )
-                reply = completion.choices[0].message.content
-                return OverviewChatResponse(reply=reply)
-            except Exception as e_new:
-                pass # fallback
-                
-        completion = await client_openrouter.chat.completions.create(
-            model=request.model,
+        reply = await call_llm(
             messages=api_messages,
             timeout=60,
+            fallback_model=request.model,
         )
-        reply = completion.choices[0].message.content
         return OverviewChatResponse(reply=reply)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -177,9 +154,9 @@ async def chat_with_overview(request: OverviewChatRequest):
 async def generate_podcast_audio(request: PodcastRequest):
     """Generate a podcast MP3 from the overview markdown using edge-tts.
     Streams SSE events with heartbeat to prevent timeouts."""
-    if not settings.openrouter_api_key:
+    if not settings.openrouter_api_key and not settings.openai_api_key:
         raise HTTPException(
-            status_code=500, detail="OpenRouter API key not configured"
+            status_code=500, detail="No API key configured for LLM provider"
         )
 
     if not request.overview_markdown or len(request.overview_markdown.strip()) < 50:
@@ -225,4 +202,3 @@ async def serve_podcast(filename: str):
         media_type="audio/mpeg",
         filename=safe_filename,
     )
-
