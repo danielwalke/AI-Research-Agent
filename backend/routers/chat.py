@@ -33,7 +33,7 @@ async def chat_with_paper(request: ChatRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="No API key configured for LLM provider")
 
     # Construct messages with system prompt containing paper text
-    system_prompt = f"You are a helpful AI assistant analyzing a research paper.\n\nTitle: {paper.title}\nAbstract: {paper.abstract}\n\nFull Text Snippet:\n{paper.full_text[:30000] if paper.full_text else 'No full text available'}"
+    system_prompt = f"You are a helpful AI assistant analyzing a research paper.\n\nTitle: {paper.title}\nAbstract: {paper.abstract}\n\nFull Text Snippet:\n{paper.full_text[:15000] if paper.full_text else 'No full text available'}"
     
     api_messages = [{"role": "system", "content": system_prompt}]
     for msg in request.messages:

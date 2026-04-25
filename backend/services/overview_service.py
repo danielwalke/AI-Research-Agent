@@ -35,7 +35,7 @@ def count_tokens(text: str) -> int:
 # Context window — hardcoded for the primary model (AcademicCloud doesn't
 # expose context_length in its /models response).
 # ---------------------------------------------------------------------------
-PRIMARY_CONTEXT_WINDOW = 128_000  # Qwen 3.5 / Llama 3.3 etc.
+PRIMARY_CONTEXT_WINDOW = 32_000  # Safe batch size to ensure fast, sub-10s responses
 
 
 def _get_context_window() -> int:

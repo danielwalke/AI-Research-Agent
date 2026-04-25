@@ -53,7 +53,7 @@ fi
 echo "-> Environment check passed."
 if [ "$HAS_PRIMARY" = "yes" ]; then
     echo "   Primary LLM : AcademicCloud ($(grep BASE_URL "$ENV_FILE" | cut -d= -f2))"
-    echo "   Model        : qwen3.5-397b-a17b (Qwen 3.5 397B)"
+    echo "   Model        : qwen3.5-122b-a10b (Qwen 3.5 122B)"
 fi
 if [ "$HAS_FALLBACK" = "yes" ]; then
     echo "   Fallback LLM : OpenRouter"
@@ -126,7 +126,7 @@ if command -v ngrok &> /dev/null; then
         echo "   Local:  http://localhost:5174"
         echo "   Public: $NGROK_URL"
         echo ""
-        echo "   LLM:    qwen3.5-397b-a17b (AcademicCloud)"
+        echo "   LLM:    qwen3.5-122b-a10b (AcademicCloud)"
         echo "           3 retries -> OpenRouter fallback"
         echo "==================================================="
         echo "$(date '+%Y-%m-%d %H:%M:%S') - Ngrok URL: $NGROK_URL" >> "$LOG_FILE"
@@ -144,7 +144,7 @@ else
     echo ""
     echo "   Local:  http://localhost:5174"
     echo ""
-    echo "   LLM:    qwen3.5-397b-a17b (AcademicCloud)"
+    echo "   LLM:    qwen3.5-122b-a10b (AcademicCloud)"
     echo "           3 retries -> OpenRouter fallback"
     echo ""
     echo "   NOTE: ngrok not installed. Install it for public access:"
