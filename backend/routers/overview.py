@@ -28,6 +28,7 @@ class OverviewRequest(BaseModel):
     end_date: Optional[str] = None  # defaults to today
     search: Optional[str] = None
     category: Optional[str] = None
+    mode: Optional[str] = "digest"
 
 
 class OverviewResponse(BaseModel):
@@ -88,6 +89,7 @@ async def generate_research_overview(
                 db, start_dt, end_dt,
                 search=request.search,
                 category=request.category,
+                mode=request.mode or "digest",
             )
         )
         # Yield initial status immediately

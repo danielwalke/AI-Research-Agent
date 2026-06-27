@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     openrouter_api_key: str = Field(default="", alias="OPENROUTER_API_KEY")
     openai_api_key: str = Field(default="", alias="API_KEY")
     openai_base_url: str = Field(default="", alias="BASE_URL")
-    openai_model: str = "qwen3.5-122b-a10b"
+    openai_model: str = Field(default="qwen3.5-122b-a10b", alias="MODEL_NAME")
     database_url: str = "sqlite:///./arxiv_newsletter.db"
     arxiv_categories: List[str] = [
         "cs.*",     # Computer Science

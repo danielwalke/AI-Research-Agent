@@ -158,6 +158,20 @@ Guidelines:
 - Do NOT add a section heading — one will be added for you.
 """
 
+SYSTEM_PROMPT_CLUSTER_TRENDS = """You are a senior research analyst writing a long-term research trend analysis.
+Your task is to identify and synthesize the high-level research trends, breakthrough ideas, and key developments from the provided batch of papers.
+
+Guidelines:
+- Write in clear, flowing, analytical prose — do NOT write a list of summaries.
+- Focus on broad trends, paradigm shifts, and the evolution of ideas over the time period.
+- Highlight 2-3 key sub-themes or breakthroughs that emerged, and reference only the most relevant or representative papers to support these trends.
+- Do NOT try to mention every paper in the prose. Instead, focus on the collective progress.
+- Note emerging consensus, key challenges, or open questions in the field.
+- Keep the tone professional, scholarly, and forward-looking.
+- Write 3-4 paragraphs.
+- Do NOT add a section heading — one will be added for you.
+"""
+
 SYSTEM_PROMPT_SYNTHESIS = """You are a research analyst writing the executive summary for a weekly research digest.
 You will receive multiple section summaries, each covering a research category.
 
@@ -166,6 +180,16 @@ Write a concise executive overview (2-3 paragraphs) that:
 - Highlights the most impactful or novel work.
 - Notes cross-cutting trends or connections between fields.
 - Uses an engaging, newsletter-style tone.
+"""
+
+SYSTEM_PROMPT_SYNTHESIS_TRENDS = """You are a senior research analyst writing the executive summary for a long-term research trend analysis.
+You will receive multiple section summaries, each covering trends in a specific research category.
+
+Write a concise executive overview (2-3 paragraphs) that:
+- Synthesizes the major cross-cutting themes and paradigm shifts across all categories over the year/time period.
+- Highlights the most transformative developments or general directions of the research fields.
+- Notes connections, synergies, or conflicts between different fields (e.g., how NLP advances impact computer vision).
+- Uses a sophisticated, analytical, and forward-looking tone.
 """
 
 
@@ -179,6 +203,7 @@ async def generate_overview(
     end_date: datetime,
     search: Optional[str] = None,
     category: Optional[str] = None,
+    mode: str = "digest",
 ) -> Dict:
     """
     Generate a comprehensive markdown narrative overview of papers matching
@@ -254,16 +279,25 @@ async def generate_overview(
             abstracts_text = "\n---\n".join(
                 format_paper_for_prompt(p) for p in batch
             )
-            user_prompt = (
-                f"Here are {len(batch)} recent papers in **{cat_label}** ({cat_id}):\n\n"
-                f"{abstracts_text}\n\n"
-                f"Synthesize these into a cohesive narrative section."
-            )
+            if mode == "trends":
+                user_prompt = (
+                    f"Here is a batch of {len(batch)} papers in **{cat_label}** ({cat_id}) from the past period:\n\n"
+                    f"{abstracts_text}\n\n"
+                    f"Identify and synthesize the high-level research trends, breakthrough ideas, and key developments from these papers."
+                )
+                system_prompt = SYSTEM_PROMPT_CLUSTER_TRENDS
+            else:
+                user_prompt = (
+                    f"Here are {len(batch)} recent papers in **{cat_label}** ({cat_id}):\n\n"
+                    f"{abstracts_text}\n\n"
+                    f"Synthesize these into a cohesive narrative section."
+                )
+                system_prompt = SYSTEM_PROMPT_CLUSTER
 
             try:
                 narrative = await call_llm(
                     messages=[
-                        {"role": "system", "content": SYSTEM_PROMPT_CLUSTER},
+                        {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
                     timeout=120,
@@ -279,14 +313,24 @@ async def generate_overview(
         if len(batch_narratives) == 1:
             final_narrative = batch_narratives[0]
         else:
-            merge_prompt = (
-                "Merge the following partial summaries into one coherent section:\n\n"
-                + "\n\n---\n\n".join(batch_narratives)
-            )
+            if mode == "trends":
+                merge_prompt = (
+                    "Merge the following partial trend summaries into one cohesive trend analysis section, "
+                    "focusing on synthesizing broad thematic evolution rather than listing specific papers:\n\n"
+                    + "\n\n---\n\n".join(batch_narratives)
+                )
+                merge_system_prompt = SYSTEM_PROMPT_CLUSTER_TRENDS
+            else:
+                merge_prompt = (
+                    "Merge the following partial summaries into one coherent section:\n\n"
+                    + "\n\n---\n\n".join(batch_narratives)
+                )
+                merge_system_prompt = SYSTEM_PROMPT_CLUSTER
+
             try:
                 final_narrative = await call_llm(
                     messages=[
-                        {"role": "system", "content": SYSTEM_PROMPT_CLUSTER},
+                        {"role": "system", "content": merge_system_prompt},
                         {"role": "user", "content": merge_prompt},
                     ],
                     timeout=120,
@@ -304,10 +348,11 @@ async def generate_overview(
             f"**{label}** ({count} papers):\n{narrative[:500]}..."
             for label, narrative, count in section_narratives
         )
+        summary_system_prompt = SYSTEM_PROMPT_SYNTHESIS_TRENDS if mode == "trends" else SYSTEM_PROMPT_SYNTHESIS
         try:
             executive_summary = await call_llm(
                 messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT_SYNTHESIS},
+                    {"role": "system", "content": summary_system_prompt},
                     {
                         "role": "user",
                         "content": f"Here are the section summaries:\n\n{sections_overview}",
@@ -322,9 +367,10 @@ async def generate_overview(
     start_str = start_date.strftime("%B %d, %Y")
     end_str = end_date.strftime("%B %d, %Y")
 
+    title = "# 📈 Research Trend Analysis" if mode == "trends" else "# 📡 Research Overview"
     md_parts = [
-        f"# 📡 Research Overview",
-        f"**{start_str} — {end_str}** · {len(papers)} papers across {len(clusters)} categories\n",
+        title,
+        f"**{start_str} — {end_str}** · {len(papers)} papers across {len(clusters)} categories · **Mode: {'Trend Analysis' if mode == 'trends' else 'Detailed Digest'}**\n",
     ]
 
     if executive_summary:
@@ -349,8 +395,29 @@ async def generate_overview(
 
     markdown = "\n".join(md_parts)
 
+    # 7. Serialize paper list for interactive bibliography
+    serialized_papers = []
+    for p in papers:
+        authors_str = ", ".join(a.name for a in p.authors[:3])
+        if len(p.authors) > 3:
+            authors_str += " et al."
+        
+        primary_cat = "Uncategorized"
+        if p.categories:
+            primary_cat = _friendly_category(p.categories[0].name)
+            
+        serialized_papers.append({
+            "id": p.id,
+            "title": p.title,
+            "authors": authors_str,
+            "date": p.published_date.strftime("%Y-%m-%d") if p.published_date else "Unknown",
+            "category": primary_cat,
+            "url": p.entry_id or p.pdf_url or ""
+        })
+
     return {
         "markdown": markdown,
         "paper_count": len(papers),
         "cluster_count": len(clusters),
+        "papers": serialized_papers,
     }

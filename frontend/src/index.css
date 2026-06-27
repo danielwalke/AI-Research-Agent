@@ -813,3 +813,121 @@ h6 {
     display: none;
   }
 }
+
+/* ---- Overview Mode Selector ---- */
+.overview-mode-selector {
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.mode-selector-tabs {
+  display: flex;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: var(--border-radius-md);
+  padding: 4px;
+  border: 1px solid var(--surface-border);
+}
+
+.mode-selector-btn {
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  border-radius: var(--border-radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 500;
+  transition: all var(--transition-speed);
+}
+
+.mode-selector-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.mode-selector-btn.active {
+  background: var(--primary-color);
+  color: white;
+}
+
+/* ---- Source Papers Accordion ---- */
+.source-papers-section {
+  padding: 24px;
+  margin: 16px 24px 24px 24px;
+}
+
+.category-papers-details {
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-md);
+  margin-bottom: 12px;
+  background: rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  transition: all var(--transition-speed);
+}
+
+.category-papers-details[open] {
+  background: rgba(0, 0, 0, 0.25);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.category-papers-details[open] .category-papers-summary svg {
+  transform: rotate(180deg);
+}
+
+.category-papers-summary {
+  font-weight: 600;
+  cursor: pointer;
+  padding: 14px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  outline: none;
+  user-select: none;
+  list-style: none;
+}
+
+.category-papers-summary::-webkit-details-marker {
+  display: none;
+}
+
+.category-papers-content {
+  padding: 0 18px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.source-paper-item {
+  cursor: pointer;
+  padding: 10px 14px;
+  border-radius: var(--border-radius-sm);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid transparent;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+}
+
+.source-paper-item:hover {
+  background: rgba(99, 102, 241, 0.08);
+  border-color: rgba(99, 102, 241, 0.2);
+  transform: translateX(4px);
+}
+
+.source-paper-title {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.source-paper-meta {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}

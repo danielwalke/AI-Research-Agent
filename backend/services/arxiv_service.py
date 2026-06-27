@@ -147,7 +147,10 @@ def fetch_papers_for_range(
     
     # Determine which categories to query
     if category:
-        categories_to_query = [category]
+        if category in ("all", "*"):
+            categories_to_query = [None]
+        else:
+            categories_to_query = [category]
     else:
         categories_to_query = settings.arxiv_categories
     
@@ -155,7 +158,11 @@ def fetch_papers_for_range(
     arxiv_client = arxiv.Client()
     
     for cat in categories_to_query:
-        query_str = f"cat:{cat} AND {date_filter}"
+        if cat:
+            query_str = f"cat:{cat} AND {date_filter}"
+        else:
+            query_str = date_filter
+            
         logger.info(f"Fetching papers for query: {query_str}")
         
         search = arxiv.Search(

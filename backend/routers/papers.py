@@ -42,6 +42,7 @@ class FetchRangeRequest(BaseModel):
     start_date: str  # YYYY-MM-DD
     end_date: str    # YYYY-MM-DD
     category: Optional[str] = None
+    max_results: Optional[int] = 200
 
 @router.get("/", response_model=List[PaperResponse])
 def get_papers(
@@ -137,7 +138,7 @@ async def fetch_range(request: FetchRangeRequest):
             task = loop.run_in_executor(
                 None,
                 fetch_papers_for_range,
-                db, start_dt, end_dt, request.category,
+                db, start_dt, end_dt, request.category, request.max_results,
             )
 
             yield f"data: {json.dumps({'status': 'processing', 'message': 'Starting ArXiv fetch...'})}\n\n"

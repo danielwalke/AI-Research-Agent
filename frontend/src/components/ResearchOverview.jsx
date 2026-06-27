@@ -1,7 +1,8 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import ReactMarkdown from 'react-markdown'
-import { BookOpen, Loader, Sparkles, RefreshCw, Send, Bot, User, MessageSquare, Mic, Download, Play, Pause, Volume2 } from 'lucide-react'
+import { BookOpen, Loader, Sparkles, RefreshCw, Send, Bot, User, MessageSquare, Mic, Download, Play, Pause, Volume2, ChevronDown } from 'lucide-react'
 
 export default function ResearchOverview({ startDate, endDate, search, category }) {
     const [markdown, setMarkdown] = useState('')
@@ -9,6 +10,8 @@ export default function ResearchOverview({ startDate, endDate, search, category 
     const [clusterCount, setClusterCount] = useState(0)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
+    const [mode, setMode] = useState('digest')
+    const [papersList, setPapersList] = useState([])
 
     // Chat state
     const [chatMessages, setChatMessages] = useState([])
@@ -22,6 +25,24 @@ export default function ResearchOverview({ startDate, endDate, search, category 
     const [podcastError, setPodcastError] = useState('')
     const [podcastStatus, setPodcastStatus] = useState('')
     const audioRef = useRef(null)
+    const navigate = useNavigate()
+
+    // Auto-detect mode based on date range (trends for > 30 days or all time)
+    useEffect(() => {
+        if (startDate) {
+            const start = new Date(startDate);
+            const end = endDate ? new Date(endDate) : new Date();
+            const diffTime = Math.abs(end - start);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            if (diffDays > 30) {
+                setMode('trends');
+            } else {
+                setMode('digest');
+            }
+        } else {
+            setMode('trends');
+        }
+    }, [startDate, endDate]);
 
     const handleGenerate = async () => {
         setLoading(true)
@@ -34,6 +55,7 @@ export default function ResearchOverview({ startDate, endDate, search, category 
             if (endDate) body.end_date = endDate
             if (search) body.search = search
             if (category) body.category = category
+            body.mode = mode
 
             const response = await fetch('/api/overview/generate', {
                 method: 'POST',
@@ -75,6 +97,7 @@ export default function ResearchOverview({ startDate, endDate, search, category 
                             setMarkdown(data.result.markdown);
                             setPaperCount(data.result.paper_count);
                             setClusterCount(data.result.cluster_count);
+                            setPapersList(data.result.papers || []);
                             setShowChat(true);
                         } else if (data.status === 'error') {
                             throw new Error(data.detail || 'Server encountered an error.');
@@ -239,6 +262,32 @@ export default function ResearchOverview({ startDate, endDate, search, category 
                             {filterDesc.length === 0 && <span className="tag">All papers</span>}
                         </div>
 
+                        {/* Overview Mode Selector */}
+                        <div className="overview-mode-selector">
+                            <label style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: '500' }}>Select Overview Style:</label>
+                            <div className="mode-selector-tabs">
+                                <button
+                                    type="button"
+                                    className={`mode-selector-btn ${mode === 'digest' ? 'active' : ''}`}
+                                    onClick={() => setMode('digest')}
+                                >
+                                    Detailed Digest
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`mode-selector-btn ${mode === 'trends' ? 'active' : ''}`}
+                                    onClick={() => setMode('trends')}
+                                >
+                                    Trend Analysis
+                                </button>
+                            </div>
+                            <p style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', maxWidth: '400px', textAlign: 'center', marginTop: '4px', lineHeight: 1.4 }}>
+                                {mode === 'digest' 
+                                    ? 'Detailed, paper-by-paper narrative synthesizing recent research categories. Best for short time ranges (weeks).' 
+                                    : 'High-level synthesis of broad research directions and key breakthroughs over time. Best for long time ranges (months/years).'}
+                            </p>
+                        </div>
+
                         {error && (
                             <p style={{ color: '#f87171', marginBottom: '16px', fontSize: '0.9rem' }}>{error}</p>
                         )}
@@ -325,6 +374,54 @@ export default function ResearchOverview({ startDate, endDate, search, category 
                 <div className="overview-body glass-panel" style={{ margin: '16px 24px 24px 24px' }}>
                     <ReactMarkdown>{markdown}</ReactMarkdown>
                 </div>
+
+                {/* Collapsible Bibliography */}
+                {papersList && papersList.length > 0 && (
+                    <div className="source-papers-section glass-panel">
+                        <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <BookOpen size={20} color="var(--primary-color)" /> Analyzed Source Papers ({papersList.length})
+                        </h3>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+                            The following papers were analyzed by the LLM to generate this overview. Click on any paper to open its PDF and chat with the AI assistant.
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {Object.entries(
+                                papersList.reduce((acc, p) => {
+                                    const cat = p.category || 'Uncategorized';
+                                    if (!acc[cat]) acc[cat] = [];
+                                    acc[cat].push(p);
+                                    return acc;
+                                }, {})
+                            ).map(([catName, catPapers]) => (
+                                <details key={catName} className="category-papers-details">
+                                    <summary className="category-papers-summary">
+                                        <span>
+                                            {catName}{' '}
+                                            <span style={{ fontWeight: 'normal', color: 'var(--text-tertiary)', fontSize: '0.85rem', marginLeft: '6px' }}>
+                                                ({catPapers.length} paper{catPapers.length !== 1 ? 's' : ''})
+                                            </span>
+                                        </span>
+                                        <ChevronDown size={16} style={{ color: 'var(--text-tertiary)', transition: 'transform var(--transition-speed)' }} />
+                                    </summary>
+                                    <div className="category-papers-content">
+                                        {catPapers.map(p => (
+                                            <div 
+                                                key={p.id} 
+                                                className="source-paper-item" 
+                                                onClick={() => navigate(`/paper/${p.id}`)}
+                                            >
+                                                <span className="source-paper-title">{p.title}</span>
+                                                <span className="source-paper-meta">
+                                                    {p.authors} · {p.date}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </details>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Chat Panel */}

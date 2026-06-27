@@ -3,6 +3,7 @@ import axios from 'axios'
 import SidebarFilter from '../components/SidebarFilter'
 import NewsletterList from '../components/NewsletterList'
 import ResearchOverview from '../components/ResearchOverview'
+import ArXivImporterModal from '../components/ArXivImporterModal'
 
 export default function Home() {
     const [papers, setPapers] = useState([])
@@ -19,8 +20,7 @@ export default function Home() {
     const [hasMore, setHasMore] = useState(false)
     const [skip, setSkip] = useState(0)
     const [showOverview, setShowOverview] = useState(false)
-    const [fetchingPapers, setFetchingPapers] = useState(false)
-    const [fetchMessage, setFetchMessage] = useState('')
+    const [isImporterOpen, setIsImporterOpen] = useState(false)
 
     const PAGE_SIZE = 20
 
@@ -62,78 +62,6 @@ export default function Home() {
         return () => clearTimeout(delayDebounceFn)
     }, [search, category, startDate, endDate])
 
-    const handleFetchRange = async () => {
-        if (!startDate) return
-        setFetchingPapers(true)
-        setFetchMessage('Starting ArXiv fetch...')
-
-        try {
-            const body = {
-                start_date: startDate,
-                end_date: endDate || new Date().toISOString().split('T')[0],
-            }
-            if (category) body.category = category
-
-            const response = await fetch('/api/papers/fetch-range', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-            })
-
-            if (!response.ok) {
-                let errDetail = 'Failed to fetch papers.'
-                try {
-                    const errData = await response.json()
-                    errDetail = errData.detail || errDetail
-                } catch (e) {}
-                throw new Error(errDetail)
-            }
-
-            const reader = response.body.getReader()
-            const decoder = new TextDecoder()
-            let buffer = ''
-
-            while (true) {
-                const { done, value } = await reader.read()
-                if (done) break
-
-                buffer += decoder.decode(value, { stream: true })
-                const parts = buffer.split('\n\n')
-                buffer = parts.pop() || ''
-
-                for (const part of parts) {
-                    const line = part.trim()
-                    if (line.startsWith('data:')) {
-                        const dataStr = line.substring(5).trim()
-                        if (!dataStr) continue
-
-                        const data = JSON.parse(dataStr)
-                        if (data.status === 'processing') {
-                            setFetchMessage(data.message || 'Fetching papers...')
-                        } else if (data.status === 'complete') {
-                            setFetchMessage(`Done! ${data.new_papers} new papers fetched.`)
-                            // Refresh paper list
-                            setTimeout(() => {
-                                fetchPapers()
-                                setFetchingPapers(false)
-                                setFetchMessage('')
-                            }, 2000)
-                        } else if (data.status === 'error') {
-                            throw new Error(data.detail || 'Server encountered an error.')
-                        }
-                    }
-                }
-            }
-        } catch (err) {
-            console.error(err)
-            setFetchMessage(`Error: ${err.message}`)
-            setTimeout(() => {
-                setFetchingPapers(false)
-                setFetchMessage('')
-            }, 3000)
-        }
-    }
-
     return (
         <>
             <SidebarFilter
@@ -147,15 +75,18 @@ export default function Home() {
                 setEndDate={setEndDate}
                 showOverview={showOverview}
                 setShowOverview={setShowOverview}
-                onFetchRange={handleFetchRange}
-                fetchingPapers={fetchingPapers}
-                fetchMessage={fetchMessage}
+                onOpenImporter={() => setIsImporterOpen(true)}
             />
             {showOverview ? (
                 <ResearchOverview startDate={startDate} endDate={endDate} search={search} category={category} />
             ) : (
                 <NewsletterList papers={papers} loading={loading} hasMore={hasMore} onLoadMore={handleLoadMore} loadingMore={loadingMore} />
             )}
+            <ArXivImporterModal 
+                isOpen={isImporterOpen} 
+                onClose={() => setIsImporterOpen(false)} 
+                onImportSuccess={() => fetchPapers()} 
+            />
         </>
     )
 }
