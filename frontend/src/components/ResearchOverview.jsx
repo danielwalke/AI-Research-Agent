@@ -5,25 +5,50 @@ import ReactMarkdown from 'react-markdown'
 import { BookOpen, Loader, Sparkles, RefreshCw, Send, Bot, User, MessageSquare, Mic, Download, Play, Pause, Volume2, ChevronDown } from 'lucide-react'
 
 export default function ResearchOverview({ startDate, endDate, search, category }) {
-    const [markdown, setMarkdown] = useState('')
-    const [paperCount, setPaperCount] = useState(0)
-    const [clusterCount, setClusterCount] = useState(0)
+    const currentFiltersKey = JSON.stringify({ startDate, endDate, search, category });
+    const savedFiltersKey = sessionStorage.getItem('overview_last_filters');
+    const isSameFilters = currentFiltersKey === savedFiltersKey;
+
+    const [markdown, setMarkdown] = useState(() => {
+        return isSameFilters ? (sessionStorage.getItem('overview_markdown') || '') : '';
+    });
+    const [paperCount, setPaperCount] = useState(() => {
+        return isSameFilters ? parseInt(sessionStorage.getItem('overview_paperCount') || '0', 10) : 0;
+    });
+    const [clusterCount, setClusterCount] = useState(() => {
+        return isSameFilters ? parseInt(sessionStorage.getItem('overview_clusterCount') || '0', 10) : 0;
+    });
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const [mode, setMode] = useState('digest')
-    const [papersList, setPapersList] = useState([])
+    const [papersList, setPapersList] = useState(() => {
+        const saved = sessionStorage.getItem('overview_papersList');
+        return isSameFilters && saved ? JSON.parse(saved) : [];
+    });
 
     // Chat state
-    const [chatMessages, setChatMessages] = useState([])
+    const [chatMessages, setChatMessages] = useState(() => {
+        const saved = sessionStorage.getItem('overview_chatMessages');
+        return isSameFilters && saved ? JSON.parse(saved) : [];
+    });
     const [chatInput, setChatInput] = useState('')
     const [chatLoading, setChatLoading] = useState(false)
-    const [showChat, setShowChat] = useState(false)
+    const [showChat, setShowChat] = useState(() => {
+        return isSameFilters ? sessionStorage.getItem('overview_showChat') === 'true' : false;
+    });
 
     // Podcast state
     const [podcastLoading, setPodcastLoading] = useState(false)
-    const [podcastUrl, setPodcastUrl] = useState('')
+    const [podcastUrl, setPodcastUrl] = useState(() => {
+        return isSameFilters ? (sessionStorage.getItem('overview_podcastUrl') || '') : '';
+    });
     const [podcastError, setPodcastError] = useState('')
     const [podcastStatus, setPodcastStatus] = useState('')
+
+    // Progress loading state
+    const [loadingProgress, setLoadingProgress] = useState(0)
+    const [currentLoadingCategory, setCurrentLoadingCategory] = useState('')
+
     const audioRef = useRef(null)
     const navigate = useNavigate()
 
@@ -50,6 +75,10 @@ export default function ResearchOverview({ startDate, endDate, search, category 
         setChatMessages([])
         setPodcastUrl('')
         setPodcastError('')
+        setMarkdown('')
+        setLoadingProgress(0)
+        setCurrentLoadingCategory('Initializing...')
+        sessionStorage.removeItem('overview_scroll_top') // clear scroll
         try {
             const body = { start_date: startDate }
             if (endDate) body.end_date = endDate
@@ -92,13 +121,19 @@ export default function ResearchOverview({ startDate, endDate, search, category 
                         
                         const data = JSON.parse(dataStr);
                         if (data.status === 'processing') {
-                            // heartbeat, do nothing
-                        } else if (data.status === 'complete') {
+                            if (data.progress !== undefined) setLoadingProgress(data.progress);
+                            if (data.current_category) setCurrentLoadingCategory(data.current_category);
+                        } else if (data.status === 'generating' || data.status === 'synthesizing' || data.status === 'finishing') {
+                            if (data.progress !== undefined) setLoadingProgress(data.progress);
+                            if (data.current_category) setCurrentLoadingCategory(data.current_category);
+                        } else if (data.status === 'complete' && data.result) {
                             setMarkdown(data.result.markdown);
                             setPaperCount(data.result.paper_count);
                             setClusterCount(data.result.cluster_count);
                             setPapersList(data.result.papers || []);
                             setShowChat(true);
+                            setLoadingProgress(100);
+                            setCurrentLoadingCategory('Complete');
                         } else if (data.status === 'error') {
                             throw new Error(data.detail || 'Server encountered an error.');
                         }
@@ -112,6 +147,69 @@ export default function ResearchOverview({ startDate, endDate, search, category 
             setLoading(false)
         }
     }
+
+    // Sync overview state to sessionStorage
+    useEffect(() => {
+        sessionStorage.setItem('overview_markdown', markdown);
+        if (markdown) {
+            sessionStorage.setItem('overview_last_filters', JSON.stringify({ startDate, endDate, search, category }));
+        }
+    }, [markdown, startDate, endDate, search, category]);
+
+    useEffect(() => {
+        sessionStorage.setItem('overview_paperCount', paperCount);
+    }, [paperCount]);
+
+    useEffect(() => {
+        sessionStorage.setItem('overview_clusterCount', clusterCount);
+    }, [clusterCount]);
+
+    useEffect(() => {
+        sessionStorage.setItem('overview_papersList', JSON.stringify(papersList));
+    }, [papersList]);
+
+    useEffect(() => {
+        sessionStorage.setItem('overview_chatMessages', JSON.stringify(chatMessages));
+    }, [chatMessages]);
+
+    useEffect(() => {
+        sessionStorage.setItem('overview_showChat', showChat);
+    }, [showChat]);
+
+    useEffect(() => {
+        sessionStorage.setItem('overview_podcastUrl', podcastUrl);
+    }, [podcastUrl]);
+
+    // Save scroll on scroll event dynamically to avoid unmount data loss
+    useEffect(() => {
+        const handleScroll = (e) => {
+            sessionStorage.setItem('overview_scroll_top', e.target.scrollTop);
+        };
+        const overviewPanel = document.querySelector('.overview-narrative-panel');
+        if (overviewPanel) {
+            overviewPanel.addEventListener('scroll', handleScroll);
+        }
+        return () => {
+            if (overviewPanel) {
+                overviewPanel.removeEventListener('scroll', handleScroll);
+            }
+        };
+    }, [markdown, loading]);
+
+    // Restore scroll after markdown render
+    useEffect(() => {
+        if (markdown && !loading) {
+            const savedScroll = sessionStorage.getItem('overview_scroll_top');
+            if (savedScroll) {
+                setTimeout(() => {
+                    const overviewPanel = document.querySelector('.overview-narrative-panel');
+                    if (overviewPanel) {
+                        overviewPanel.scrollTop = parseInt(savedScroll, 10);
+                    }
+                }, 50);
+            }
+        }
+    }, [markdown, loading]);
 
     const handleChatSend = async () => {
         if (!chatInput.trim() || chatLoading) return
@@ -207,25 +305,58 @@ export default function ResearchOverview({ startDate, endDate, search, category 
     if (search) filterDesc.push(`"${search}"`)
 
     if (loading) {
+        const progressPercent = loadingProgress || 0;
+        const isClusteringActive = progressPercent < 10;
+        const isReadingActive = progressPercent >= 10 && progressPercent < 85;
+        const isSynthesizingActive = progressPercent >= 85;
+
         return (
             <div className="main-content">
                 <div className="overview-loading glass-panel">
-                    <div className="overview-loading-inner">
-                        <Loader size={48} className="spin-animation" style={{ color: 'var(--primary-color)' }} />
-                        <h2 style={{ background: 'linear-gradient(135deg, var(--primary-color), var(--secondary-color))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                    <div className="overview-loading-inner" style={{ width: '100%', maxWidth: '500px' }}>
+                        <Loader size={48} className="spin-animation" style={{ color: 'var(--primary-color)', marginBottom: '8px' }} />
+                        <h2 style={{ background: 'linear-gradient(135deg, var(--primary-color), var(--secondary-color))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', textAlign: 'center' }}>
                             Generating Research Overview
                         </h2>
-                        <p style={{ color: 'var(--text-secondary)', maxWidth: '400px', textAlign: 'center', lineHeight: 1.6 }}>
-                            Clustering papers by category and synthesizing narratives with AI. This may take 30–60 seconds depending on the number of papers.
+                        <p style={{ color: 'var(--text-secondary)', maxWidth: '400px', textAlign: 'center', lineHeight: 1.6, fontSize: '0.95rem' }}>
+                            Clustering papers by category and synthesizing narratives with AI.
                         </p>
-                        <div className="loading-steps">
-                            <div className="loading-step active">
+                        
+                        {/* Premium Glassmorphic Progress Bar */}
+                        <div style={{ width: '100%', marginTop: '16px', marginBottom: '16px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                                <span style={{ fontWeight: '500' }}>
+                                    {currentLoadingCategory ? `Processing: ${currentLoadingCategory}` : 'Initializing...'}
+                                </span>
+                                <span style={{ fontWeight: '600', color: 'var(--primary-color)' }}>{progressPercent}%</span>
+                            </div>
+                            <div style={{
+                                width: '100%',
+                                height: '8px',
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                borderRadius: '4px',
+                                overflow: 'hidden',
+                                border: '1px solid var(--surface-border)'
+                            }}>
+                                <div style={{
+                                    width: `${progressPercent}%`,
+                                    height: '100%',
+                                    background: 'linear-gradient(90deg, var(--primary-color), var(--secondary-color))',
+                                    boxShadow: '0 0 8px var(--primary-glow)',
+                                    borderRadius: '4px',
+                                    transition: 'width 0.4s ease-out'
+                                }} />
+                            </div>
+                        </div>
+
+                        <div className="loading-steps" style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', alignItems: 'center' }}>
+                            <div className={`loading-step ${isClusteringActive ? 'active' : ''}`} style={{ opacity: isClusteringActive ? 1 : 0.4 }}>
                                 <Sparkles size={14} /> Clustering papers
                             </div>
-                            <div className="loading-step">
+                            <div className={`loading-step ${isReadingActive ? 'active' : ''}`} style={{ opacity: isReadingActive ? 1 : 0.4 }}>
                                 <BookOpen size={14} /> Reading abstracts
                             </div>
-                            <div className="loading-step">
+                            <div className={`loading-step ${isSynthesizingActive ? 'active' : ''}`} style={{ opacity: isSynthesizingActive ? 1 : 0.4 }}>
                                 <RefreshCw size={14} /> Synthesizing narrative
                             </div>
                         </div>

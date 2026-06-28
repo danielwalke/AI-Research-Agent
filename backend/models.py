@@ -47,3 +47,13 @@ class Category(Base):
     name = Column(String, unique=True, index=True)
 
     papers = relationship("Paper", secondary=paper_category_association, back_populates="categories")
+
+
+class OverviewCache(Base):
+    __tablename__ = "overview_caches"
+
+    id = Column(Integer, primary_key=True, index=True)
+    cache_key = Column(String, unique=True, index=True)
+    result_json = Column(Text)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+

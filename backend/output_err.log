@@ -9,3 +9,45 @@ INFO:apscheduler.scheduler:Added job "fetch_job" to job store "default"
 INFO:apscheduler.scheduler:Added job "fetch_job" to job store "default"
 INFO:apscheduler.scheduler:Scheduler started
 INFO:     Application startup complete.
+INFO:apscheduler.executors.default:Running job "fetch_job (trigger: date[2026-06-27 12:53:13 CEST], next run at: 2026-06-27 12:53:13 CEST)" (scheduled at 2026-06-27 12:53:13.333734+02:00)
+INFO:apscheduler.scheduler:Removed job 10f4eeec8a02482bbada2c665da7f215
+INFO:main:Starting background arxiv fetch job...
+INFO:services.arxiv_service:Fetching papers for category: cs.*
+INFO:arxiv:Requesting page (first: True, try: 0): https://export.arxiv.org/api/query?search_query=cat%3Acs.%2A&id_list=&sortBy=submittedDate&sortOrder=descending&start=0&max_results=100
+INFO:arxiv:Got first page: 100 of 897697 total results
+INFO:services.arxiv_service:Fetching papers for category: stat.*
+INFO:arxiv:Requesting page (first: True, try: 0): https://export.arxiv.org/api/query?search_query=cat%3Astat.%2A&id_list=&sortBy=submittedDate&sortOrder=descending&start=0&max_results=100
+INFO:arxiv:Got first page: 100 of 130099 total results
+INFO:services.arxiv_service:Fetching papers for category: q-bio.*
+INFO:arxiv:Requesting page (first: True, try: 0): https://export.arxiv.org/api/query?search_query=cat%3Aq-bio.%2A&id_list=&sortBy=submittedDate&sortOrder=descending&start=0&max_results=100
+INFO:arxiv:Got first page: 100 of 54252 total results
+INFO:services.arxiv_service:Fetching papers for category: cs.AI
+INFO:arxiv:Requesting page (first: True, try: 0): https://export.arxiv.org/api/query?search_query=cat%3Acs.AI&id_list=&sortBy=submittedDate&sortOrder=descending&start=0&max_results=100
+INFO:arxiv:Got first page: 100 of 186596 total results
+INFO:services.arxiv_service:Fetching papers for category: cs.LG
+INFO:arxiv:Requesting page (first: True, try: 0): https://export.arxiv.org/api/query?search_query=cat%3Acs.LG&id_list=&sortBy=submittedDate&sortOrder=descending&start=0&max_results=100
+INFO:arxiv:Got first page: 100 of 274728 total results
+INFO:main:Finished background arxiv fetch job.
+INFO:apscheduler.executors.default:Job "fetch_job (trigger: date[2026-06-27 12:53:13 CEST], next run at: 2026-06-27 12:53:13 CEST)" executed successfully
+INFO:services.overview_service:Found 16 papers in 1 categories
+INFO:services.overview_service:Token budget: context_window=32000, max_abstract_tokens=22100
+INFO:services.overview_service:Category 'Quantitative Methods (Biology)': 16 papers, 1 batch(es)
+INFO:services.llm_service:Primary LLM client configured: https://llm.bi.denbi.de/v1
+INFO:services.llm_service:[LLM] Primary attempt 1/3 model=vllm/google/gemma-4-31B-it
+INFO:services.overview_service:Found 59 papers in 1 categories
+INFO:services.overview_service:Token budget: context_window=32000, max_abstract_tokens=22100
+INFO:services.overview_service:Category 'Artificial Intelligence': 59 papers, 1 batch(es)
+INFO:services.llm_service:[LLM] Primary attempt 1/3 model=vllm/google/gemma-4-31B-it
+INFO:httpx:HTTP Request: POST https://llm.bi.denbi.de/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:services.llm_service:[LLM] Primary succeeded
+INFO:httpx:HTTP Request: POST https://llm.bi.denbi.de/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:services.llm_service:[LLM] Primary succeeded
+INFO:services.overview_service:Found 22 papers in 1 categories
+INFO:services.overview_service:Token budget: context_window=32000, max_abstract_tokens=22100
+INFO:services.overview_service:Category 'Machine Learning (Statistics)': 22 papers, 1 batch(es)
+INFO:services.llm_service:[LLM] Primary attempt 1/3 model=vllm/google/gemma-4-31B-it
+INFO:services.llm_service:[LLM] Primary attempt 1/3 model=vllm/google/gemma-4-31B-it
+INFO:httpx:HTTP Request: POST https://llm.bi.denbi.de/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:services.llm_service:[LLM] Primary succeeded
+INFO:httpx:HTTP Request: POST https://llm.bi.denbi.de/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:services.llm_service:[LLM] Primary succeeded

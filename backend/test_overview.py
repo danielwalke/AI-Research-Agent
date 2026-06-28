@@ -1,13 +1,14 @@
 import asyncio
 import logging
 from datetime import datetime, timedelta
-from database import SessionLocal
+from database import SessionLocal, Base, engine
 from services.overview_service import generate_overview
 
 logging.basicConfig(level=logging.INFO)
 
 async def test_overview():
     print("Testing generate_overview()...")
+    Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     start_dt = datetime.utcnow() - timedelta(days=7)
     end_dt = datetime.utcnow() + timedelta(days=1)

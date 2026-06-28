@@ -12,7 +12,7 @@ from typing import List, Dict, Tuple, Optional
 from sqlalchemy.orm import Session
 
 from sqlalchemy import or_
-from models import Paper, Author, Category
+from models import Paper, Author, Category, OverviewCache
 from config import settings
 from services.llm_service import call_llm
 
@@ -204,6 +204,7 @@ async def generate_overview(
     search: Optional[str] = None,
     category: Optional[str] = None,
     mode: str = "digest",
+    progress_callback = None,
 ) -> Dict:
     """
     Generate a comprehensive markdown narrative overview of papers matching
@@ -240,6 +241,27 @@ async def generate_overview(
             "cluster_count": 0,
         }
 
+    # 1b. Check Cache
+    import hashlib
+    import json
+    paper_ids = sorted([p.id for p in papers])
+    key_data = {
+        "paper_ids": paper_ids,
+        "mode": mode,
+        "category": category,
+        "search": search
+    }
+    key_string = json.dumps(key_data, sort_keys=True)
+    cache_key = hashlib.sha256(key_string.encode('utf-8')).hexdigest()
+
+    cached_entry = db.query(OverviewCache).filter(OverviewCache.cache_key == cache_key).first()
+    if cached_entry:
+        logger.info(f"Cache hit for overview with key {cache_key}")
+        try:
+            return json.loads(cached_entry.result_json)
+        except Exception as e:
+            logger.error(f"Error decoding cached JSON: {e}. Re-generating.")
+
     # 2. Cluster (skip re-clustering when a specific category is selected)
     if category:
         # When filtering by category, show all papers under that category heading
@@ -264,11 +286,21 @@ async def generate_overview(
         f"max_abstract_tokens={max_abstract_tokens}"
     )
 
+    if progress_callback:
+        await progress_callback("generating", "Clustering papers", 5)
+
     # 4. Generate per-cluster narratives (uses centralized call_llm with 3 retries + fallback)
     section_narratives: List[Tuple[str, str, int]] = []  # (category, narrative, paper_count)
 
+    total_categories = len(clusters)
+    processed_categories = 0
+
     for cat_id, cat_papers in clusters.items():
         cat_label = _friendly_category(cat_id)
+        if progress_callback:
+            progress_pct = int(10 + (processed_categories / total_categories) * 70)
+            await progress_callback("generating", f"{cat_label}", progress_pct)
+
         batches = batch_papers_by_budget(cat_papers, max_abstract_tokens)
         logger.info(
             f"Category '{cat_label}': {len(cat_papers)} papers, {len(batches)} batch(es)"
@@ -293,7 +325,7 @@ async def generate_overview(
                     f"Synthesize these into a cohesive narrative section."
                 )
                 system_prompt = SYSTEM_PROMPT_CLUSTER
-
+ 
             try:
                 narrative = await call_llm(
                     messages=[
@@ -340,10 +372,13 @@ async def generate_overview(
                 final_narrative = "\n\n".join(batch_narratives)
 
         section_narratives.append((cat_label, final_narrative, len(cat_papers)))
+        processed_categories += 1
 
     # 5. Generate executive summary
     executive_summary = ""
     if len(section_narratives) > 1:
+        if progress_callback:
+            await progress_callback("synthesizing", "Executive Summary", 85)
         sections_overview = "\n\n".join(
             f"**{label}** ({count} papers):\n{narrative[:500]}..."
             for label, narrative, count in section_narratives
@@ -415,9 +450,27 @@ async def generate_overview(
             "url": p.entry_id or p.pdf_url or ""
         })
 
-    return {
+    result = {
         "markdown": markdown,
         "paper_count": len(papers),
         "cluster_count": len(clusters),
         "papers": serialized_papers,
     }
+
+    # Save to cache
+    try:
+        new_cache = OverviewCache(
+            cache_key=cache_key,
+            result_json=json.dumps(result)
+        )
+        db.add(new_cache)
+        db.commit()
+        logger.info(f"Cached generated overview with key {cache_key}")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to write overview to cache: {e}")
+
+    if progress_callback:
+        await progress_callback("finishing", "Done", 100)
+
+    return result

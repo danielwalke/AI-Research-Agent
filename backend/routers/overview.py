@@ -84,25 +84,38 @@ async def generate_research_overview(
         end_dt = datetime.utcnow() + timedelta(days=1)
 
     async def event_generator():
+        queue = asyncio.Queue()
+
+        async def progress_callback(status: str, current_category: str, progress: int):
+            await queue.put({
+                "status": status,
+                "current_category": current_category,
+                "progress": progress
+            })
+
         task = asyncio.create_task(
             generate_overview(
                 db, start_dt, end_dt,
                 search=request.search,
                 category=request.category,
                 mode=request.mode or "digest",
+                progress_callback=progress_callback,
             )
         )
         # Yield initial status immediately
-        yield f"data: {json.dumps({'status': 'processing'})}\n\n"
+        yield f"data: {json.dumps({'status': 'processing', 'current_category': 'Clustering papers', 'progress': 0})}\n\n"
         
-        while not task.done():
+        while not task.done() or not queue.empty():
             try:
-                # wait_for throws TimeoutError if timeout expires
-                await asyncio.wait_for(asyncio.shield(task), timeout=10.0)
+                item = await asyncio.wait_for(queue.get(), timeout=1.0)
+                yield f"data: {json.dumps(item)}\n\n"
+                queue.task_done()
             except asyncio.TimeoutError:
-                yield f"data: {json.dumps({'status': 'processing'})}\n\n"
+                if not task.done():
+                    yield f"data: {json.dumps({'status': 'heartbeat'})}\n\n"
+                else:
+                    break
             except Exception:
-                # If inner task fails, task.done() becomes True, loop exits
                 pass
         
         try:
